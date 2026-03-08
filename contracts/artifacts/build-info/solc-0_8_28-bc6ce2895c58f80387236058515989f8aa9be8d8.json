@@ -1,0 +1,39 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-bc6ce2895c58f80387236058515989f8aa9be8d8",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/PrivateMail.sol": "project/contracts/PrivateMail.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/PrivateMail.sol": {
+        "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.28;\r\n\r\n/**\r\n * @title PrivateMail\r\n * @notice On-chain registry for encryption public keys and encrypted message storage.\r\n * @dev Recipients register public keys; senders encrypt and store ciphertext. Metadata visible on-chain.\r\n */\r\ncontract PrivateMail {\r\n    error ZeroAddress();\r\n    error EmptyPublicKey();\r\n    error AlreadyRegistered(address owner);\r\n    error EmptyCiphertext();\r\n    error RecipientNotRegistered(address recipient);\r\n    error InvalidMessageId(uint256 messageId);\r\n\r\n    struct Message {\r\n        address sender;\r\n        address recipient;\r\n        bytes ciphertext;\r\n        uint256 timestamp;\r\n        bytes32 contentHash;\r\n    }\r\n\r\n    uint256 public nextMessageId;\r\n    mapping(uint256 => Message) public messages;\r\n    mapping(address => bytes) public encryptionPublicKeys;\r\n    mapping(address => bool) public hasRegisteredKey;\r\n\r\n    event PublicKeyRegistered(address indexed owner, bytes pubKey);\r\n    event MessageSent(\r\n        uint256 indexed messageId,\r\n        address indexed sender,\r\n        address indexed recipient,\r\n        uint256 timestamp,\r\n        bytes32 contentHash\r\n    );\r\n\r\n    /**\r\n     * @notice Register the caller's encryption public key. One-time only; key is deterministic from identity.\r\n     * @param pubKey Raw public key bytes (e.g. X25519 or uncompressed secp256k1).\r\n     */\r\n    function registerPublicKey(bytes calldata pubKey) external {\r\n        if (msg.sender == address(0)) revert ZeroAddress();\r\n        if (pubKey.length == 0) revert EmptyPublicKey();\r\n        if (hasRegisteredKey[msg.sender]) revert AlreadyRegistered(msg.sender);\r\n        encryptionPublicKeys[msg.sender] = pubKey;\r\n        hasRegisteredKey[msg.sender] = true;\r\n        emit PublicKeyRegistered(msg.sender, pubKey);\r\n    }\r\n\r\n    /**\r\n     * @notice Send an encrypted message to a recipient.\r\n     * @param recipient Recipient address (must have registered a public key).\r\n     * @param ciphertext Encrypted message payload.\r\n     * @param contentHash Keccak256 of plaintext for integrity verification.\r\n     * @return messageId Assigned message ID for retrieval.\r\n     */\r\n    function sendMessage(\r\n        address recipient,\r\n        bytes calldata ciphertext,\r\n        bytes32 contentHash\r\n    ) external returns (uint256 messageId) {\r\n        if (recipient == address(0)) revert ZeroAddress();\r\n        if (!hasRegisteredKey[recipient]) revert RecipientNotRegistered(recipient);\r\n        if (ciphertext.length == 0) revert EmptyCiphertext();\r\n\r\n        messageId = nextMessageId++;\r\n        messages[messageId] = Message({\r\n            sender: msg.sender,\r\n            recipient: recipient,\r\n            ciphertext: ciphertext,\r\n            timestamp: block.timestamp,\r\n            contentHash: contentHash\r\n        });\r\n\r\n        emit MessageSent(messageId, msg.sender, recipient, block.timestamp, contentHash);\r\n        return messageId;\r\n    }\r\n\r\n    /**\r\n     * @notice Fetch a message by ID.\r\n     */\r\n    function getMessage(uint256 messageId) external view returns (Message memory) {\r\n        if (messageId >= nextMessageId) revert InvalidMessageId(messageId);\r\n        return messages[messageId];\r\n    }\r\n\r\n    /**\r\n     * @notice Get the encryption public key for an address.\r\n     */\r\n    function getPublicKey(address owner) external view returns (bytes memory) {\r\n        return encryptionPublicKeys[owner];\r\n    }\r\n\r\n    /**\r\n     * @notice Check if an address has registered a public key.\r\n     */\r\n    function isRegistered(address owner) external view returns (bool) {\r\n        return hasRegisteredKey[owner];\r\n    }\r\n}\r\n"
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "project5-contract-deployer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "deploy": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "ethers": "^6.15.0",
+    "dotenv": "^17.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "~5.8.0",
+    "tsx": "^4.19.3"
+  }
+}

@@ -1,0 +1,111 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+.app nav {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.app nav button {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+.app .panel {
+  text-align: left;
+  max-width: 480px;
+  margin: 1rem auto;
+  padding: 1rem;
+  border: 1px solid #333;
+  border-radius: 8px;
+}
+
+.app .panel input,
+.app .panel textarea {
+  display: block;
+  width: 100%;
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+}
+
+.app .panel textarea {
+  min-height: 80px;
+}
+
+.app .panel button {
+  margin: 0.5rem 0.5rem 0 0;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+.app .error {
+  color: #e74c3c;
+  margin-top: 1rem;
+}
+
+.app .success {
+  color: #27ae60;
+  margin-top: 0.5rem;
+}
+
+.app .address-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.app .address-row code {
+  font-size: 0.9em;
+}
+
+.app .panel ul {
+  list-style: none;
+  padding: 0;
+}
+
+.app .panel li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #333;
+}
