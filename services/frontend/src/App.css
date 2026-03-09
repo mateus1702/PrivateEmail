@@ -64,7 +64,7 @@
 .app .panel input,
 .app .panel textarea {
   display: block;
-  width: 100%;
+  width: 90%;
   margin: 0.5rem 0;
   padding: 0.5rem;
 }
@@ -108,4 +108,197 @@
 .app .panel li {
   padding: 0.5rem 0;
   border-bottom: 1px solid #333;
+}
+
+.app .back-button {
+  display: block;
+  margin: 1rem 0;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+.app .app-header {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0;
+  justify-content: flex-end;
+}
+
+.app .app-header button {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: var(--bg-color, #1a1a1a);
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 1.5rem;
+  max-width: 480px;
+  width: 90%;
+  text-align: left;
+}
+
+.modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.modal .modal-header h2 {
+  margin: 0;
+}
+
+.modal .modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+  color: inherit;
+}
+
+.modal input,
+.modal textarea {
+  display: block;
+  width: 100%;
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  box-sizing: border-box;
+}
+
+.modal textarea {
+  min-height: 80px;
+}
+
+.modal button {
+  margin: 0.5rem 0.5rem 0 0;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+/* Full-screen logged layout */
+.app.app--logged {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  max-width: none;
+  text-align: left;
+  background: var(--bg-color, #242424);
+}
+
+.logged-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.logged-title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.logged-header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.logged-header-actions button {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+.logged-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.logged-inbox-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.logged-inbox-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.logged-messages {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  padding: 1rem 1.5rem;
+  margin: 0;
+}
+
+.logged-messages li {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #333;
+}
+
+.logged-messages li:last-child {
+  border-bottom: none;
+}
+
+.logged-footer {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1.5rem;
+  border-top: 1px solid #333;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.logged-footer-address {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.logged-footer-address code {
+  font-size: 0.9em;
+}
+
+.logged-error {
+  position: absolute;
+  bottom: 1rem;
+  left: 1.5rem;
+  right: 1.5rem;
+  margin: 0;
+}
+
+@media (prefers-color-scheme: light) {
+  .app.app--logged {
+    background: #ffffff;
+  }
 }

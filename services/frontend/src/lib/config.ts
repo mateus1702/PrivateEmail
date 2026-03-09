@@ -31,7 +31,7 @@ export async function loadEnv(): Promise<EnvConfig> {
   const url = `${window.location.origin}/config/env.json`;
   const res = await fetch(url);
   if (!res.ok) {
-    cachedEnv = {
+    const fallback: EnvConfig = {
       VITE_RPC_URL: import.meta.env.VITE_RPC_URL ?? "http://127.0.0.1:8545",
       VITE_BUNDLER_URL: import.meta.env.VITE_BUNDLER_URL ?? "",
       VITE_PAYMASTER_API_URL: import.meta.env.VITE_PAYMASTER_API_URL ?? "",
@@ -41,10 +41,12 @@ export async function loadEnv(): Promise<EnvConfig> {
       VITE_ANVIL_WHALE_CANDIDATES: import.meta.env.VITE_ANVIL_WHALE_CANDIDATES ?? "0x47c031236e19d024b42f8de678d3110562d925b5,0x794a61358D6845594F94dc1DB02A252b5b4814aD,0xF977814e90dA44bFA03b6295A0616a897441aceC,0x28C6c06298d514Db089934071355E5743bf21d60",
       VITE_ENABLE_ANVIL_WHALE_FUNDING: import.meta.env.VITE_ENABLE_ANVIL_WHALE_FUNDING ?? "true",
     };
-    return applyLocalDevProxy(cachedEnv);
+    cachedEnv = applyLocalDevProxy(fallback);
+    return cachedEnv;
   }
-  cachedEnv = (await res.json()) as EnvConfig;
-  return applyLocalDevProxy(cachedEnv);
+  const raw = (await res.json()) as EnvConfig;
+  cachedEnv = applyLocalDevProxy(raw);
+  return cachedEnv;
 }
 
 function applyLocalDevProxy(env: EnvConfig): EnvConfig {

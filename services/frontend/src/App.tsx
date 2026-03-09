@@ -27,20 +27,20 @@ import "./App.css";
 
 const MIN_USDC_FOR_REGISTER = parseUnits("1", 6);
 const WHALE_FUND_AMOUNT = parseUnits("10", 6);
+const INBOX_POLL_INTERVAL_MS = 30000;
 
-type Screen = "home" | "register" | "compose" | "inbox";
+type Screen = "login" | "register" | "logged";
 
 function App() {
   const [config, setConfig] = useState<ContractsConfig | null>(null);
   const [env, setEnv] = useState<EnvConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [screen, setScreen] = useState<Screen>("home");
+  const [screen, setScreen] = useState<Screen>("login");
   const [birthday, setBirthday] = useState("");
   const [password, setPassword] = useState("");
   const [recipientAddr, setRecipientAddr] = useState("");
   const [messageText, setMessageText] = useState("");
   const [inboxMessages, setInboxMessages] = useState<{ id: bigint; plaintext: string }[]>([]);
-  const [inboxAddr, setInboxAddr] = useState("");
   const [loading, setLoading] = useState(false);
 
   const [derivedAddress, setDerivedAddress] = useState<string | null>(null);
@@ -49,13 +49,22 @@ function App() {
   const [usdcBalance, setUsdcBalance] = useState<bigint | null>(null);
   const [registered, setRegistered] = useState<boolean | null>(null);
   const [isAnvil, setIsAnvil] = useState<boolean | null>(null);
-  const [isDeriving, setIsDeriving] = useState(false);
+  const [isContinueLoading, setIsContinueLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isFunding, setIsFunding] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
+
+  // Session state (cleared on logout)
+  const [sessionAddress, setSessionAddress] = useState<string | null>(null);
+  const [sessionOwnerPrivateKeyHex, setSessionOwnerPrivateKeyHex] = useState<`0x${string}` | null>(null);
+  const [sessionEncryptionPrivateKey, setSessionEncryptionPrivateKey] = useState<Uint8Array | null>(null);
+  const [sessionUsdcBalance, setSessionUsdcBalance] = useState<bigint | null>(null);
+  const [isRefreshingSessionBalance, setIsRefreshingSessionBalance] = useState(false);
+
+  const [composeModalOpen, setComposeModalOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -115,12 +124,22 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (screen === "register" && env?.VITE_RPC_URL && isAnvil === null) {
+    if ((screen === "login" || screen === "register") && env?.VITE_RPC_URL && isAnvil === null) {
       detectAnvil(env.VITE_RPC_URL).then(setIsAnvil);
     }
   }, [screen, env?.VITE_RPC_URL, isAnvil, detectAnvil]);
 
-  const handleDerive = async () => {
+  const storeSession = useCallback(
+    (addr: string, ownerHex: `0x${string}`, encryptionPrivateKey: Uint8Array) => {
+      setSessionAddress(addr);
+      setSessionOwnerPrivateKeyHex(ownerHex);
+      setSessionEncryptionPrivateKey(encryptionPrivateKey);
+      setScreen("logged");
+    },
+    []
+  );
+
+  const handleContinue = async () => {
     if (!config || !env) return;
     const [y, m, d] = birthday.split("-").map(Number);
     if (!y || !m || !d) {
@@ -131,12 +150,12 @@ function App() {
       setError("Password must be at least 8 characters");
       return;
     }
-    setIsDeriving(true);
+    setIsContinueLoading(true);
     setError(null);
     try {
       const ts = Math.floor(new Date(Date.UTC(y, m - 1, d)).getTime() / 1000);
       const aaKey = deriveAaPrivateKey(ts, password);
-      const { publicKey } = deriveEncryptionKeyPair(aaKey);
+      const { publicKey, privateKey } = deriveEncryptionKeyPair(aaKey);
       const pubKeyHex = bytesToHex(publicKeyToBytes(publicKey)) as `0x${string}`;
       const ownerHex = bytesToHex(aaKey) as `0x${string}`;
       const addr = await getSmartAccountAddress(
@@ -144,15 +163,28 @@ function App() {
         parseInt(env.VITE_CHAIN_ID, 10),
         ownerHex
       );
+
+      const usdcAddr = (env.VITE_USDC_ADDRESS ?? "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359") as Address;
+      const [bal, reg] = await Promise.all([
+        getUsdcBalance(env.VITE_RPC_URL, usdcAddr, addr as Address),
+        isRegistered(config, env.VITE_RPC_URL, addr as Address),
+      ]);
+
       setDerivedAddress(addr);
       setDerivedPubKeyHex(pubKeyHex);
       setOwnerPrivateKeyHex(ownerHex);
-      setUsdcBalance(null);
-      setRegistered(null);
+      setUsdcBalance(bal);
+      setRegistered(reg);
+
+      if (reg) {
+        storeSession(addr, ownerHex, privateKey);
+      } else {
+        setScreen("register");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setIsDeriving(false);
+      setIsContinueLoading(false);
     }
   };
 
@@ -299,7 +331,7 @@ function App() {
     }
   };
 
-  const handleRegister = async () => {
+  const handleCompleteRegistration = async () => {
     if (!config || !env || !derivedAddress || !derivedPubKeyHex || !ownerPrivateKeyHex) return;
     if (usdcBalance === null || usdcBalance < MIN_USDC_FOR_REGISTER) {
       setError("Need at least 1 USDC. Refresh balance or use Load from whale.");
@@ -331,8 +363,13 @@ function App() {
         pubKeyHex: derivedPubKeyHex,
         ownerPrivateKeyHex,
       });
+      const [y, m, d] = birthday.split("-").map(Number);
+      const ts = Math.floor(new Date(Date.UTC(y, m - 1, d)).getTime() / 1000);
+      const aaKey = deriveAaPrivateKey(ts, password);
+      const { privateKey } = deriveEncryptionKeyPair(aaKey);
       setRegisterSuccess(hash);
       setRegistered(true);
+      storeSession(derivedAddress, ownerPrivateKeyHex, privateKey);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -340,15 +377,79 @@ function App() {
     }
   };
 
+  const handleBack = useCallback(() => {
+    setBirthday("");
+    setPassword("");
+    clearDerivedState();
+    setScreen("login");
+    setError(null);
+  }, [clearDerivedState]);
+
+  const handleLogout = useCallback(() => {
+    setSessionAddress(null);
+    setSessionOwnerPrivateKeyHex(null);
+    setSessionEncryptionPrivateKey(null);
+    setSessionUsdcBalance(null);
+    setScreen("login");
+    setComposeModalOpen(false);
+    setInboxMessages([]);
+    clearDerivedState();
+  }, [clearDerivedState]);
+
+  const handleRefreshSessionBalance = useCallback(async () => {
+    if (!env || !sessionAddress) return;
+    const usdcAddr = (env.VITE_USDC_ADDRESS ?? "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359") as Address;
+    setIsRefreshingSessionBalance(true);
+    setError(null);
+    try {
+      const bal = await getUsdcBalance(env.VITE_RPC_URL, usdcAddr, sessionAddress as Address);
+      setSessionUsdcBalance(bal);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIsRefreshingSessionBalance(false);
+    }
+  }, [env, sessionAddress]);
+
+  const fetchInbox = useCallback(async () => {
+    if (!config || !env || !sessionAddress || !sessionEncryptionPrivateKey) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const ids = await getInboxMessageIds(config, env.VITE_RPC_URL, sessionAddress as Address);
+      const decrypted: { id: bigint; plaintext: string }[] = [];
+      for (const id of ids) {
+        const msg = await fetchMessage(config, env.VITE_RPC_URL, id);
+        const raw =
+          typeof msg.ciphertext === "string"
+            ? hexToBytes(msg.ciphertext)
+            : new Uint8Array(msg.ciphertext as ArrayBuffer);
+        const plain = decryptWithPrivateKey(raw, sessionEncryptionPrivateKey);
+        decrypted.push({ id, plaintext: new TextDecoder().decode(plain) });
+      }
+      setInboxMessages(decrypted);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [config, env, sessionAddress, sessionEncryptionPrivateKey]);
+
+  useEffect(() => {
+    if (screen !== "logged" || !sessionAddress || !sessionEncryptionPrivateKey) return;
+    fetchInbox();
+    handleRefreshSessionBalance();
+    const interval = setInterval(() => {
+      fetchInbox();
+      handleRefreshSessionBalance();
+    }, INBOX_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [screen, sessionAddress, sessionEncryptionPrivateKey, fetchInbox, handleRefreshSessionBalance]);
+
   const handleSend = async () => {
-    if (!config || !env || !recipientAddr || !messageText) return;
+    if (!config || !env || !recipientAddr || !messageText || !sessionOwnerPrivateKeyHex) return;
     if (!/^0x[a-fA-F0-9]{40}$/.test(recipientAddr)) {
       setError("Invalid recipient address");
-      return;
-    }
-    const [y, m, d] = birthday.split("-").map(Number);
-    if (!y || !m || !d || !password) {
-      setError("Enter birthday and password (sender identity)");
       return;
     }
     if (!env.VITE_BUNDLER_URL || !env.VITE_PAYMASTER_API_URL) {
@@ -359,7 +460,6 @@ function App() {
     setIsSending(true);
     setError(null);
     setSendSuccess(null);
-    setLoading(true);
     try {
       const recipientPubKey = await createMailClient(config, env.VITE_RPC_URL).read.getPublicKey([
         recipientAddr as Address,
@@ -376,10 +476,6 @@ function App() {
       const { ciphertext } = encryptWithPublicKey(plaintext, recipPub);
       const contentHash = keccak256(plaintext);
 
-      const ts = Math.floor(new Date(Date.UTC(y, m - 1, d)).getTime() / 1000);
-      const aaKey = deriveAaPrivateKey(ts, password);
-      const ownerHex = bytesToHex(aaKey) as `0x${string}`;
-
       const aaConfig = {
         bundlerUrl: env.VITE_BUNDLER_URL,
         paymasterApiUrl: env.VITE_PAYMASTER_API_URL,
@@ -394,51 +490,16 @@ function App() {
         recipient: recipientAddr as Address,
         ciphertextHex,
         contentHash,
-        ownerPrivateKeyHex: ownerHex,
+        ownerPrivateKeyHex: sessionOwnerPrivateKeyHex,
       });
       setSendSuccess(hash);
       setMessageText("");
+      setComposeModalOpen(false);
+      fetchInbox();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setIsSending(false);
-      setLoading(false);
-    }
-  };
-
-  const handleLoadInbox = async () => {
-    if (!config || !env || !inboxAddr) return;
-    if (!/^0x[a-fA-F0-9]{40}$/.test(inboxAddr)) {
-      setError("Invalid address");
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const ids = await getInboxMessageIds(config, env.VITE_RPC_URL, inboxAddr as Address);
-      const [y, m, d] = birthday.split("-").map(Number);
-      if (!y || !m || !d || !password) {
-        setError("Enter birthday and password to decrypt");
-        return;
-      }
-      const ts = Math.floor(new Date(Date.UTC(y, m - 1, d)).getTime() / 1000);
-      const aaKey = deriveAaPrivateKey(ts, password);
-      const { privateKey } = deriveEncryptionKeyPair(aaKey);
-      const decrypted: { id: bigint; plaintext: string }[] = [];
-      for (const id of ids) {
-        const msg = await fetchMessage(config, env.VITE_RPC_URL, id);
-        const raw =
-          typeof msg.ciphertext === "string"
-            ? hexToBytes(msg.ciphertext)
-            : new Uint8Array(msg.ciphertext as ArrayBuffer);
-        const plain = decryptWithPrivateKey(raw, privateKey);
-        decrypted.push({ id, plaintext: new TextDecoder().decode(plain) });
-      }
-      setInboxMessages(decrypted);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -462,26 +523,13 @@ function App() {
     usdcBalance >= MIN_USDC_FOR_REGISTER &&
     registered === false;
 
-  return (
-    <div className="app">
-      <h1>Private Mail</h1>
-      <nav>
-        <button onClick={() => setScreen("home")}>Home</button>
-        <button onClick={() => setScreen("register")}>Register</button>
-        <button onClick={() => setScreen("compose")}>Compose</button>
-        <button onClick={() => setScreen("inbox")}>Inbox</button>
-      </nav>
-
-      {screen === "home" && (
+  // Login screen
+  if (screen === "login") {
+    return (
+      <div className="app">
+        <h1>Private Mail</h1>
         <div className="panel">
-          <p>Connect and derive identity from birthday + password.</p>
-          <p>Contract: {config.PrivateMail.address}</p>
-        </div>
-      )}
-
-      {screen === "register" && (
-        <div className="panel">
-          <h2>Register public key</h2>
+          <h2>Login or Register</h2>
           <input
             type="date"
             placeholder="Birthday (YYYY-MM-DD)"
@@ -494,120 +542,149 @@ function App() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          <button onClick={handleDerive} disabled={isDeriving}>
-            {isDeriving ? "Deriving…" : "Derive address"}
+          <button onClick={handleContinue} disabled={isContinueLoading}>
+            {isContinueLoading ? "Checking…" : "Continue"}
           </button>
+        </div>
 
-          {derivedAddress && (
-            <>
-              <p className="address-row">
-                <strong>Your address:</strong>{" "}
-                <code title={derivedAddress}>
-                  {derivedAddress.slice(0, 10)}…{derivedAddress.slice(-8)}
-                </code>
-                <button
-                  type="button"
-                  onClick={() => navigator.clipboard?.writeText(derivedAddress)}
-                  title="Copy"
-                >
-                  Copy
-                </button>
-              </p>
-              <p>
-                <strong>USDC balance:</strong>{" "}
-                {usdcBalance !== null ? formatUnits(usdcBalance, 6) : "—"}
-              </p>
-              <p>
-                <strong>Registered:</strong> {registered === true ? "Yes" : registered === false ? "No" : "—"}
-              </p>
-              <button onClick={handleRefreshBalance} disabled={isRefreshing}>
-                {isRefreshing ? "Refreshing…" : "Refresh balance"}
-              </button>
-              {isAnvil &&
-                env.VITE_ENABLE_ANVIL_WHALE_FUNDING !== "false" && (
-                  <button onClick={handleLoadFromWhale} disabled={isFunding}>
-                    {isFunding ? "Loading…" : "Load 10 USDC from whale"}
-                  </button>
-                )}
-              <button onClick={handleRegister} disabled={!canRegister || isRegistering}>
-                {isRegistering ? "Registering…" : "Register"}
-              </button>
-              {registerSuccess && (
-                <p className="success">Registered. Tx: {registerSuccess.slice(0, 18)}…</p>
-              )}
-            </>
+        {error && <p className="error">{error}</p>}
+      </div>
+    );
+  }
+
+  // Register screen (unregistered users only)
+  if (screen === "register") {
+    return (
+      <div className="app">
+        <h1>Private Mail</h1>
+        <button onClick={handleBack} className="back-button">
+          Back
+        </button>
+        <div className="panel">
+          <h2>Complete Registration</h2>
+          <p className="address-row">
+            <strong>Your address:</strong>{" "}
+            <code title={derivedAddress ?? ""}>
+              {derivedAddress ? `${derivedAddress.slice(0, 10)}…${derivedAddress.slice(-8)}` : ""}
+            </code>
+            <button
+              type="button"
+              onClick={() => derivedAddress && navigator.clipboard?.writeText(derivedAddress)}
+              title="Copy"
+            >
+              Copy
+            </button>
+          </p>
+          <p>Send at least 1 USDC to this address to complete registration.</p>
+          <p>
+            <strong>USDC balance:</strong>{" "}
+            {usdcBalance !== null ? formatUnits(usdcBalance, 6) : "—"}
+          </p>
+          <button onClick={handleRefreshBalance} disabled={isRefreshing}>
+            {isRefreshing ? "Refreshing…" : "Refresh balance"}
+          </button>
+          {isAnvil && env.VITE_ENABLE_ANVIL_WHALE_FUNDING !== "false" && (
+            <button onClick={handleLoadFromWhale} disabled={isFunding}>
+              {isFunding ? "Loading…" : "Load 10 USDC from whale"}
+            </button>
+          )}
+          <button
+            onClick={handleCompleteRegistration}
+            disabled={!canRegister || isRegistering}
+          >
+            {isRegistering ? "Registering…" : "Complete registration"}
+          </button>
+          {registerSuccess && (
+            <p className="success">Registered. Tx: {registerSuccess.slice(0, 18)}…</p>
           )}
         </div>
-      )}
 
-      {screen === "compose" && (
-        <div className="panel">
-          <h2>Compose</h2>
-          <input
-            type="date"
-            placeholder="Your birthday"
-            value={birthday}
-            onChange={(e) => setBirthday(e.target.value)}
-          />
-          <input
-            type="password"
-            placeholder="Your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <input
-            placeholder="Recipient address"
-            value={recipientAddr}
-            onChange={(e) => setRecipientAddr(e.target.value)}
-          />
-          <textarea
-            placeholder="Message"
-            value={messageText}
-            onChange={(e) => setMessageText(e.target.value)}
-          />
-          <button onClick={handleSend} disabled={isSending || loading}>
-            {isSending ? "Sending…" : "Send"}
-          </button>
-          {sendSuccess && (
-            <p className="success">Sent. Tx: {sendSuccess.slice(0, 18)}…</p>
-          )}
+        {error && <p className="error">{error}</p>}
+      </div>
+    );
+  }
+
+  // Logged screen (full-screen layout)
+  return (
+    <div className="app app--logged">
+      <header className="logged-header">
+        <h1 className="logged-title">Private Mail</h1>
+        <div className="logged-header-actions">
+          <button onClick={() => setComposeModalOpen(true)}>Compose</button>
+          <button onClick={handleLogout}>Logout</button>
         </div>
-      )}
+      </header>
 
-      {screen === "inbox" && (
-        <div className="panel">
+      <main className="logged-main">
+        <div className="logged-inbox-header">
           <h2>Inbox</h2>
-          <input
-            type="date"
-            placeholder="Your birthday"
-            value={birthday}
-            onChange={(e) => setBirthday(e.target.value)}
-          />
-          <input
-            type="password"
-            placeholder="Your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <input
-            placeholder="Your address"
-            value={inboxAddr}
-            onChange={(e) => setInboxAddr(e.target.value)}
-          />
-          <button onClick={handleLoadInbox} disabled={loading}>
-            {loading ? "Loading…" : "Load inbox"}
+          <button onClick={fetchInbox} disabled={loading}>
+            {loading ? "Refreshing…" : "Refresh"}
           </button>
-          <ul>
-            {inboxMessages.map((m) => (
-              <li key={m.id.toString()}>
-                <strong>#{m.id.toString()}</strong> {m.plaintext}
-              </li>
-            ))}
-          </ul>
+        </div>
+        <ul className="logged-messages">
+          {inboxMessages.map((m) => (
+            <li key={m.id.toString()}>
+              <strong>#{m.id.toString()}</strong> {m.plaintext}
+            </li>
+          ))}
+        </ul>
+      </main>
+
+      <footer className="logged-footer">
+        <div className="logged-footer-address">
+          <strong>Account:</strong>{" "}
+          <code title={sessionAddress ?? ""}>
+            {sessionAddress ? `${sessionAddress.slice(0, 10)}…${sessionAddress.slice(-8)}` : ""}
+          </code>
+          <button
+            type="button"
+            onClick={() => sessionAddress && navigator.clipboard?.writeText(sessionAddress)}
+            title="Copy"
+          >
+            Copy
+          </button>
+        </div>
+        <div className="logged-footer-balance">
+          <strong>USDC:</strong>{" "}
+          {sessionUsdcBalance !== null ? formatUnits(sessionUsdcBalance, 6) : "—"}
+        </div>
+        <button
+          onClick={handleRefreshSessionBalance}
+          disabled={isRefreshingSessionBalance}
+        >
+          {isRefreshingSessionBalance ? "Refreshing…" : "Refresh balance"}
+        </button>
+      </footer>
+
+      {composeModalOpen && (
+        <div className="modal-overlay" onClick={() => setComposeModalOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Compose</h2>
+              <button type="button" className="modal-close" onClick={() => setComposeModalOpen(false)}>
+                ×
+              </button>
+            </div>
+            <input
+              placeholder="Recipient address"
+              value={recipientAddr}
+              onChange={(e) => setRecipientAddr(e.target.value)}
+            />
+            <textarea
+              placeholder="Message"
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+            />
+            <button onClick={handleSend} disabled={isSending}>
+              {isSending ? "Sending…" : "Send"}
+            </button>
+            {sendSuccess && <p className="success">Sent. Tx: {sendSuccess.slice(0, 18)}…</p>}
+          </div>
         </div>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error logged-error">{error}</p>}
     </div>
   );
 }
