@@ -2,8 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { loadConfig, loadEnv, type ContractsConfig, type EnvConfig } from "./lib/config";
 import {
   createMailClient,
-  getInboxMessageIds,
-  fetchMessage,
   getUsdcBalance,
   isRegistered,
 } from "./lib/contracts";
@@ -16,7 +14,6 @@ import {
   deriveAaPrivateKey,
   deriveEncryptionKeyPair,
   encryptWithPublicKey,
-  decryptWithPrivateKey,
   publicKeyToBytes,
   bytesToHex,
   hexToBytes,
@@ -40,8 +37,6 @@ function App() {
   const [password, setPassword] = useState("");
   const [recipientAddr, setRecipientAddr] = useState("");
   const [messageText, setMessageText] = useState("");
-  const [inboxMessages, setInboxMessages] = useState<{ id: bigint; plaintext: string }[]>([]);
-  const [loading, setLoading] = useState(false);
 
   const [derivedAddress, setDerivedAddress] = useState<string | null>(null);
   const [derivedPubKeyHex, setDerivedPubKeyHex] = useState<`0x${string}` | null>(null);
@@ -60,7 +55,6 @@ function App() {
   // Session state (cleared on logout)
   const [sessionAddress, setSessionAddress] = useState<string | null>(null);
   const [sessionOwnerPrivateKeyHex, setSessionOwnerPrivateKeyHex] = useState<`0x${string}` | null>(null);
-  const [sessionEncryptionPrivateKey, setSessionEncryptionPrivateKey] = useState<Uint8Array | null>(null);
   const [sessionUsdcBalance, setSessionUsdcBalance] = useState<bigint | null>(null);
   const [isRefreshingSessionBalance, setIsRefreshingSessionBalance] = useState(false);
 
@@ -130,10 +124,9 @@ function App() {
   }, [screen, env?.VITE_RPC_URL, isAnvil, detectAnvil]);
 
   const storeSession = useCallback(
-    (addr: string, ownerHex: `0x${string}`, encryptionPrivateKey: Uint8Array) => {
+    (addr: string, ownerHex: `0x${string}`) => {
       setSessionAddress(addr);
       setSessionOwnerPrivateKeyHex(ownerHex);
-      setSessionEncryptionPrivateKey(encryptionPrivateKey);
       setScreen("logged");
     },
     []
@@ -155,7 +148,7 @@ function App() {
     try {
       const ts = Math.floor(new Date(Date.UTC(y, m - 1, d)).getTime() / 1000);
       const aaKey = deriveAaPrivateKey(ts, password);
-      const { publicKey, privateKey } = deriveEncryptionKeyPair(aaKey);
+      const { publicKey } = deriveEncryptionKeyPair(aaKey);
       const pubKeyHex = bytesToHex(publicKeyToBytes(publicKey)) as `0x${string}`;
       const ownerHex = bytesToHex(aaKey) as `0x${string}`;
       const addr = await getSmartAccountAddress(
@@ -177,7 +170,7 @@ function App() {
       setRegistered(reg);
 
       if (reg) {
-        storeSession(addr, ownerHex, privateKey);
+        storeSession(addr, ownerHex);
       } else {
         setScreen("register");
       }
@@ -363,13 +356,9 @@ function App() {
         pubKeyHex: derivedPubKeyHex,
         ownerPrivateKeyHex,
       });
-      const [y, m, d] = birthday.split("-").map(Number);
-      const ts = Math.floor(new Date(Date.UTC(y, m - 1, d)).getTime() / 1000);
-      const aaKey = deriveAaPrivateKey(ts, password);
-      const { privateKey } = deriveEncryptionKeyPair(aaKey);
       setRegisterSuccess(hash);
       setRegistered(true);
-      storeSession(derivedAddress, ownerPrivateKeyHex, privateKey);
+      storeSession(derivedAddress, ownerPrivateKeyHex);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -388,11 +377,9 @@ function App() {
   const handleLogout = useCallback(() => {
     setSessionAddress(null);
     setSessionOwnerPrivateKeyHex(null);
-    setSessionEncryptionPrivateKey(null);
     setSessionUsdcBalance(null);
     setScreen("login");
     setComposeModalOpen(false);
-    setInboxMessages([]);
     clearDerivedState();
   }, [clearDerivedState]);
 
@@ -411,40 +398,15 @@ function App() {
     }
   }, [env, sessionAddress]);
 
-  const fetchInbox = useCallback(async () => {
-    if (!config || !env || !sessionAddress || !sessionEncryptionPrivateKey) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const ids = await getInboxMessageIds(config, env.VITE_RPC_URL, sessionAddress as Address);
-      const decrypted: { id: bigint; plaintext: string }[] = [];
-      for (const id of ids) {
-        const msg = await fetchMessage(config, env.VITE_RPC_URL, id);
-        const raw =
-          typeof msg.ciphertext === "string"
-            ? hexToBytes(msg.ciphertext)
-            : new Uint8Array(msg.ciphertext as ArrayBuffer);
-        const plain = decryptWithPrivateKey(raw, sessionEncryptionPrivateKey);
-        decrypted.push({ id, plaintext: new TextDecoder().decode(plain) });
-      }
-      setInboxMessages(decrypted);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [config, env, sessionAddress, sessionEncryptionPrivateKey]);
 
   useEffect(() => {
-    if (screen !== "logged" || !sessionAddress || !sessionEncryptionPrivateKey) return;
-    fetchInbox();
+    if (screen !== "logged" || !sessionAddress) return;
     handleRefreshSessionBalance();
     const interval = setInterval(() => {
-      fetchInbox();
       handleRefreshSessionBalance();
     }, INBOX_POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [screen, sessionAddress, sessionEncryptionPrivateKey, fetchInbox, handleRefreshSessionBalance]);
+  }, [screen, sessionAddress, handleRefreshSessionBalance]);
 
   const handleSend = async () => {
     if (!config || !env || !recipientAddr || !messageText || !sessionOwnerPrivateKeyHex) return;
@@ -495,7 +457,6 @@ function App() {
       setSendSuccess(hash);
       setMessageText("");
       setComposeModalOpen(false);
-      fetchInbox();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -527,7 +488,10 @@ function App() {
   if (screen === "login") {
     return (
       <div className="app">
-        <h1>Private Mail</h1>
+        <div className="app-header">
+          <img src="/logo.svg" alt="Private Mail Logo" className="app-logo" />
+          <h1>Private Mail</h1>
+        </div>
         <div className="panel">
           <h2>Login or Register</h2>
           <input
@@ -556,25 +520,33 @@ function App() {
   if (screen === "register") {
     return (
       <div className="app">
-        <h1>Private Mail</h1>
+        <div className="app-header">
+          <img src="/logo.svg" alt="Private Mail Logo" className="app-logo" />
+          <h1>Private Mail</h1>
+        </div>
         <button onClick={handleBack} className="back-button">
           Back
         </button>
         <div className="panel">
           <h2>Complete Registration</h2>
-          <p className="address-row">
-            <strong>Your address:</strong>{" "}
-            <code title={derivedAddress ?? ""}>
-              {derivedAddress ? `${derivedAddress.slice(0, 10)}…${derivedAddress.slice(-8)}` : ""}
-            </code>
-            <button
-              type="button"
-              onClick={() => derivedAddress && navigator.clipboard?.writeText(derivedAddress)}
-              title="Copy"
-            >
-              Copy
-            </button>
-          </p>
+          <div className="address-row">
+            <div className="address-label">
+              <strong>Your address:</strong>
+            </div>
+            <div className="address-content">
+              <code title={derivedAddress ?? ""}>
+                {derivedAddress ? `${derivedAddress.slice(0, 10)}…${derivedAddress.slice(-8)}` : ""}
+              </code>
+              <button
+                type="button"
+                onClick={() => derivedAddress && navigator.clipboard?.writeText(derivedAddress)}
+                title="Copy"
+                className="copy-button"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
           <p>Send at least 1 USDC to this address to complete registration.</p>
           <p>
             <strong>USDC balance:</strong>{" "}
@@ -604,68 +576,49 @@ function App() {
     );
   }
 
-  // Logged screen (full-screen layout)
+  // Logged screen (minimal layout with header and footer)
   return (
-    <div className="app app--logged">
-      <header className="logged-header">
-        <h1 className="logged-title">Private Mail</h1>
-        <div className="logged-header-actions">
-          <button onClick={() => setComposeModalOpen(true)}>Compose</button>
-          <button onClick={handleLogout}>Logout</button>
+    <div className="app app--logged-minimal">
+      <header className="logged-header-minimal">
+        <div className="logged-header-content">
+          <img src="/logo.svg" alt="Private Mail Logo" className="logged-logo-minimal" />
+          <h1 className="logged-title-minimal">Private Mail</h1>
         </div>
       </header>
 
-      <main className="logged-main">
-        <div className="logged-inbox-header">
-          <h2>Inbox</h2>
-          <button onClick={fetchInbox} disabled={loading}>
-            {loading ? "Refreshing…" : "Refresh"}
+      <footer className="logged-footer-minimal">
+        <div className="logged-footer-left">
+          <div className="logged-footer-address">
+            <strong>Account:</strong>{" "}
+            <code title={sessionAddress ?? ""}>
+              {sessionAddress ? `${sessionAddress.slice(0, 10)}…${sessionAddress.slice(-8)}` : ""}
+            </code>
+            <button
+              type="button"
+              onClick={() => sessionAddress && navigator.clipboard?.writeText(sessionAddress)}
+              title="Copy"
+            >
+              Copy
+            </button>
+          </div>
+          <div className="logged-footer-balance">
+            <strong>USDC:</strong>{" "}
+            {sessionUsdcBalance !== null ? formatUnits(sessionUsdcBalance, 6) : "—"}
+          </div>
+        </div>
+        <div className="logged-footer-actions">
+          <button onClick={handleRefreshSessionBalance} disabled={isRefreshingSessionBalance}>
+            {isRefreshingSessionBalance ? "Refreshing…" : "Refresh"}
           </button>
+          <button onClick={() => setComposeModalOpen(true)}>Compose</button>
+          <button onClick={handleLogout}>Logout</button>
         </div>
-        <ul className="logged-messages">
-          {inboxMessages.map((m) => (
-            <li key={m.id.toString()}>
-              <strong>#{m.id.toString()}</strong> {m.plaintext}
-            </li>
-          ))}
-        </ul>
-      </main>
-
-      <footer className="logged-footer">
-        <div className="logged-footer-address">
-          <strong>Account:</strong>{" "}
-          <code title={sessionAddress ?? ""}>
-            {sessionAddress ? `${sessionAddress.slice(0, 10)}…${sessionAddress.slice(-8)}` : ""}
-          </code>
-          <button
-            type="button"
-            onClick={() => sessionAddress && navigator.clipboard?.writeText(sessionAddress)}
-            title="Copy"
-          >
-            Copy
-          </button>
-        </div>
-        <div className="logged-footer-balance">
-          <strong>USDC:</strong>{" "}
-          {sessionUsdcBalance !== null ? formatUnits(sessionUsdcBalance, 6) : "—"}
-        </div>
-        <button
-          onClick={handleRefreshSessionBalance}
-          disabled={isRefreshingSessionBalance}
-        >
-          {isRefreshingSessionBalance ? "Refreshing…" : "Refresh balance"}
-        </button>
       </footer>
 
       {composeModalOpen && (
         <div className="modal-overlay" onClick={() => setComposeModalOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Compose</h2>
-              <button type="button" className="modal-close" onClick={() => setComposeModalOpen(false)}>
-                ×
-              </button>
-            </div>
+            <h2 className="modal-title">Compose</h2>
             <input
               placeholder="Recipient address"
               value={recipientAddr}
@@ -676,9 +629,14 @@ function App() {
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
             />
-            <button onClick={handleSend} disabled={isSending}>
-              {isSending ? "Sending…" : "Send"}
-            </button>
+            <div className="modal-actions">
+              <button type="button" className="modal-close-btn" onClick={() => setComposeModalOpen(false)}>
+                Close
+              </button>
+              <button onClick={handleSend} disabled={isSending}>
+                {isSending ? "Sending…" : "Send"}
+              </button>
+            </div>
             {sendSuccess && <p className="success">Sent. Tx: {sendSuccess.slice(0, 18)}…</p>}
           </div>
         </div>

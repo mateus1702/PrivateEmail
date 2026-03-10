@@ -1,0 +1,54 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer envelope body -->
+  <rect x="8" y="14" width="32" height="20" rx="3"
+        fill="url(#envelope-bg)"
+        stroke="url(#envelope-stroke)"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Envelope flap -->
+  <path d="M8 14L24 26L40 14"
+        stroke="url(#envelope-stroke)"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        fill="none"/>
+
+  <!-- Subtle inner shadow/highlight -->
+  <rect x="9" y="15" width="30" height="18" rx="2"
+        fill="none"
+        stroke="rgba(255, 255, 255, 0.1)"
+        stroke-width="0.5"
+        opacity="0.3"/>
+
+  <!-- Lock icon inside envelope -->
+  <g transform="translate(20, 20)">
+    <rect x="1" y="3" width="6" height="4" rx="0.5"
+          fill="none"
+          stroke="url(#lock-stroke)"
+          stroke-width="1"
+          opacity="0.7"/>
+    <circle cx="4" cy="7" r="2"
+            fill="none"
+            stroke="url(#lock-stroke)"
+            stroke-width="1"
+            opacity="0.7"/>
+  </g>
+
+  <!-- Gradients -->
+  <defs>
+    <linearGradient id="envelope-bg" x1="8" y1="14" x2="40" y2="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="rgba(113, 128, 150, 0.1)"/>
+      <stop offset="100%" stop-color="rgba(74, 85, 104, 0.05)"/>
+    </linearGradient>
+    <linearGradient id="envelope-stroke" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4a5568"/>
+      <stop offset="100%" stop-color="#2d3748"/>
+    </linearGradient>
+    <linearGradient id="lock-stroke" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#718096"/>
+      <stop offset="100%" stop-color="#4a5568"/>
+    </linearGradient>
+  </defs>
+</svg>
