@@ -16,7 +16,12 @@ import {
   parseUnits,
   type Address,
 } from "viem";
-import { entryPoint07Address } from "viem/account-abstraction";
+import {
+  entryPoint07Address,
+  getUserOperationReceipt,
+  sendUserOperation,
+} from "viem/account-abstraction";
+import { getAction } from "viem/utils";
 import { privateKeyToAccount } from "viem/accounts";
 
 export interface AaConfig {
@@ -43,6 +48,72 @@ export interface SendMessageOp {
 }
 
 const USDC_APPROVE_AMOUNT = parseUnits("1000000", 6);
+
+/** Bundler HTTP timeout (ms). Increase if eth_getUserOperationReceipt often times out on slow chains. */
+const BUNDLER_TIMEOUT_MS = 60_000;
+
+/** Extended wait for receipt (ms). VM bundlers can be slow to include UserOps on Polygon. */
+const RECEIPT_WAIT_TIMEOUT_MS = 180_000;
+const RECEIPT_POLL_INTERVAL_MS = 2_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getErrorMessage(error: unknown): string {
+  if (!error) return "";
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return String(error);
+}
+
+function isRetryableReceiptError(error: unknown): boolean {
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    message.includes("user operation receipt") ||
+    message.includes("could not be found") ||
+    message.includes("not found") ||
+    message.includes("unknown user operation") ||
+    message.includes("failed to get user operation receipt") ||
+    message.includes("rpc request failed") ||
+    message.includes("timeout") ||
+    message.includes("temporarily unavailable")
+  );
+}
+
+async function waitForReceiptResilient(
+  client: Parameters<typeof sendUserOperation>[0],
+  userOpHash: `0x${string}`
+) {
+  const deadline = Date.now() + RECEIPT_WAIT_TIMEOUT_MS;
+  let lastRetryableError: unknown;
+
+  while (Date.now() < deadline) {
+    try {
+      return await getAction(client, getUserOperationReceipt, "getUserOperationReceipt")({
+        hash: userOpHash,
+      });
+    } catch (error) {
+      if (!isRetryableReceiptError(error)) throw error;
+      lastRetryableError = error;
+      await sleep(RECEIPT_POLL_INTERVAL_MS);
+    }
+  }
+
+  const suffix = lastRetryableError
+    ? ` Last bundler error: ${getErrorMessage(lastRetryableError)}`
+    : "";
+  throw new Error(`Timed out waiting for user operation receipt for ${userOpHash}.${suffix}`);
+}
+
+async function sendAndWait(
+  client: Parameters<typeof sendUserOperation>[0],
+  args: { calls: { to: Address; value: bigint; data: `0x${string}` }[] }
+): Promise<`0x${string}`> {
+  const userOpHash = await getAction(client, sendUserOperation, "sendUserOperation")(args);
+  const receipt = await waitForReceiptResilient(client, userOpHash);
+  return receipt?.receipt.transactionHash ?? userOpHash;
+}
 
 function ensureHex(val: string): `0x${string}` {
   const s = val.startsWith("0x") ? val : `0x${val}`;
@@ -138,7 +209,7 @@ export async function submitRegisterPublicKey(
   const smartAccountClient = createSmartAccountClient({
     account,
     chain,
-    bundlerTransport: http(config.bundlerUrl),
+    bundlerTransport: http(config.bundlerUrl, { timeout: BUNDLER_TIMEOUT_MS }),
     paymaster: paymasterClient,
     userOperation: {
       estimateFeesPerGas: async () => {
@@ -160,11 +231,11 @@ export async function submitRegisterPublicKey(
     args: [op.pubKeyHex],
   });
 
-  await smartAccountClient.sendTransaction({
+  await sendAndWait(smartAccountClient, {
     calls: [{ to: config.usdcAddress as Address, value: 0n, data: approveData }],
   });
 
-  const hash = await smartAccountClient.sendTransaction({
+  const hash = await sendAndWait(smartAccountClient, {
     calls: [{ to: op.mailAddress, value: 0n, data: registerData }],
   });
 
@@ -212,7 +283,7 @@ export async function submitSendMessage(
   const smartAccountClient = createSmartAccountClient({
     account,
     chain,
-    bundlerTransport: http(config.bundlerUrl),
+    bundlerTransport: http(config.bundlerUrl, { timeout: BUNDLER_TIMEOUT_MS }),
     paymaster: paymasterClient,
     userOperation: {
       estimateFeesPerGas: async () => {
@@ -230,7 +301,7 @@ export async function submitSendMessage(
     args: [op.recipient, op.ciphertextHex, op.contentHash],
   });
 
-  const hash = await smartAccountClient.sendTransaction({
+  const hash = await sendAndWait(smartAccountClient, {
     calls: [{ to: op.mailAddress, value: 0n, data: sendData }],
   });
 

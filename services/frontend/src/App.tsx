@@ -390,6 +390,17 @@ function App() {
       setRegistered(true);
       storeSession(derivedAddress, ownerPrivateKeyHex);
     } catch (e) {
+      // Some bundlers intermittently fail on receipt polling even when tx succeeded on-chain.
+      try {
+        const regNow = await isRegistered(config, env.VITE_RPC_URL, derivedAddress as Address);
+        if (regNow) {
+          setRegistered(true);
+          storeSession(derivedAddress, ownerPrivateKeyHex);
+          return;
+        }
+      } catch {
+        // Ignore fallback read errors and preserve original AA error.
+      }
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setIsRegistering(false);

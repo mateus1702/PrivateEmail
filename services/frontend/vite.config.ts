@@ -7,14 +7,15 @@ export default defineConfig({
   server: {
     proxy: {
       "/dev-paymaster-api": {
-        target: "http://127.0.0.1:3000",
+        target: "http://169.40.135.206:3000",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/dev-paymaster-api/, ""),
       },
       "/dev-bundler": {
-        target: "http://127.0.0.1:4337",
+        target: "http://169.40.135.206:4337",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/dev-bundler/, ""),
+        timeout: 180_000, // 3 min - eth_getUserOperationReceipt polling can be slow
       },
     },
   },
