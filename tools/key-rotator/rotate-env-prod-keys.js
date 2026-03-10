@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Rotates DEPLOYER_PRIVATE_KEY in .env.prod and validates the generated
+ * Rotates CONTRACT_DEPLOYER_PRIVATE_KEY in .env.prod and validates the generated
  * address is a plain EOA on the target RPC (eth_getCode == 0x).
  *
  * Usage:
@@ -27,14 +27,14 @@ function parseArgs(argv) {
 
 function showHelp() {
   console.log(`
-Rotate DEPLOYER_PRIVATE_KEY in .env.prod and validate EOA.
+Rotate CONTRACT_DEPLOYER_PRIVATE_KEY in .env.prod and validate EOA.
 
 Usage:
   node tools/key-rotator/rotate-env-prod-keys.js [options]
 
 Options:
   --env <path>           Path to env file (default: .env.prod in project root)
-  --rpc <url>            RPC URL for EOA validation (default: RPC_URL from env file)
+  --rpc <url>            RPC URL for EOA validation (default: TOOLS_RPC_URL from env file)
   --max-attempts <n>     Max generation attempts (default: 25)
   --help, -h             Show this help
 `);
@@ -116,9 +116,9 @@ async function main() {
   const lines = original.split(/\r?\n/);
   const env = parseKeyValueLines(lines);
 
-  const rpcUrl = (args.rpc || env.RPC_URL || "").trim();
+  const rpcUrl = (args.rpc || env.TOOLS_RPC_URL || "").trim();
   if (!rpcUrl) {
-    throw new Error("RPC URL not provided. Use --rpc or set RPC_URL in env file.");
+    throw new Error("RPC URL not provided. Use --rpc or set TOOLS_RPC_URL in env file.");
   }
 
   console.log(`Using RPC: ${rpcUrl}`);
@@ -135,7 +135,7 @@ async function main() {
   const deployer = await generateValidWallet(rpcUrl, maxAttempts);
 
   const replacements = {
-    DEPLOYER_PRIVATE_KEY: deployer.privateKey,
+    CONTRACT_DEPLOYER_PRIVATE_KEY: deployer.privateKey,
   };
 
   const updatedLines = updateEnvLines(lines, replacements);

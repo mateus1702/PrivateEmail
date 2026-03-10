@@ -39,6 +39,12 @@ export interface RegisterOp {
   ownerPrivateKeyHex: `0x${string}`;
 }
 
+export interface RegisterUsernameOp {
+  mailAddress: Address;
+  username: string;
+  ownerPrivateKeyHex: `0x${string}`;
+}
+
 export interface SendMessageOp {
   mailAddress: Address;
   recipient: Address;
@@ -233,6 +239,70 @@ export async function submitRegisterPublicKey(
 
   await sendAndWait(smartAccountClient, {
     calls: [{ to: config.usdcAddress as Address, value: 0n, data: approveData }],
+  });
+
+  const hash = await sendAndWait(smartAccountClient, {
+    calls: [{ to: op.mailAddress, value: 0n, data: registerData }],
+  });
+
+  return hash;
+}
+
+/**
+ * Submits registerUsername via AA.
+ */
+export async function submitRegisterUsername(
+  config: AaConfig,
+  op: RegisterUsernameOp
+): Promise<`0x${string}`> {
+  const chain = defineChain({
+    id: config.chainId,
+    name: "Chain",
+    nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+    rpcUrls: { default: { http: [config.rpcUrl] } },
+  });
+
+  const publicClient = createPublicClient({
+    chain,
+    transport: http(config.rpcUrl),
+  });
+
+  const paymasterClient = createPimlicoClient({
+    entryPoint: {
+      address: (config.entryPointAddress as Address) || entryPoint07Address,
+      version: "0.7",
+    },
+    transport: http(config.paymasterApiUrl),
+  });
+
+  const owner = privateKeyToAccount(ensureHex(op.ownerPrivateKeyHex));
+
+  const account = await toSimpleSmartAccount({
+    client: publicClient,
+    owner,
+    entryPoint: {
+      address: (config.entryPointAddress as Address) || entryPoint07Address,
+      version: "0.7",
+    },
+  });
+
+  const smartAccountClient = createSmartAccountClient({
+    account,
+    chain,
+    bundlerTransport: http(config.bundlerUrl, { timeout: BUNDLER_TIMEOUT_MS }),
+    paymaster: paymasterClient,
+    userOperation: {
+      estimateFeesPerGas: async () => {
+        const fees = await paymasterClient.getUserOperationGasPrice();
+        return fees.fast;
+      },
+    },
+  });
+
+  const registerData = encodeFunctionData({
+    abi: parseAbi(["function registerUsername(string username)"]),
+    functionName: "registerUsername",
+    args: [op.username],
   });
 
   const hash = await sendAndWait(smartAccountClient, {

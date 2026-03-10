@@ -2,7 +2,7 @@
   "name": "project5-key-rotator",
   "version": "1.0.0",
   "private": true,
-  "description": "Rotate DEPLOYER_PRIVATE_KEY in .env.prod and validate plain EOA via RPC",
+  "description": "Rotate CONTRACT_DEPLOYER_PRIVATE_KEY in .env.prod and validate plain EOA via RPC",
   "main": "rotate-env-prod-keys.js",
   "scripts": {
     "rotate": "node rotate-env-prod-keys.js"

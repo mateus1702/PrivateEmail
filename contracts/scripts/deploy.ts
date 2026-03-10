@@ -1,9 +1,13 @@
 import { config } from "dotenv";
-import { readFileSync, mkdirSync, writeFileSync } from "fs";
-import { resolve, dirname, join } from "path";
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from "fs";
+import { resolve, join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { network } from "hardhat";
 
-config({ path: resolve(process.cwd(), "..", ".env") });
+// deploy.ts lives at project5/contracts/scripts/; root package.json is at project5/
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const projectRoot = resolve(scriptDir, "..", "..");
+config({ path: join(projectRoot, ".env") });
 
 async function main() {
   const { ethers } = await network.connect();
@@ -11,31 +15,45 @@ async function main() {
   const networkInfo = await ethers.provider.getNetwork();
   const chainId = networkInfo.chainId;
 
-  console.log(`[deploy] network=localhost chainId=${chainId} deployer=${deployer.address}`);
+  const rawOutputDir = (process.env.CONTRACT_DEPLOY_OUTPUT_DIR ?? "").trim();
+  const outputDir =
+    !rawOutputDir || rawOutputDir === "/deploy-output" || rawOutputDir === "\\deploy-output"
+      ? join(projectRoot, "deploy-output")
+      : rawOutputDir;
+
+  const rawAddressFile = (process.env.CONTRACT_MAIL_ADDRESS_FILE ?? "").trim();
+  const addressFile =
+    !rawAddressFile ||
+    rawAddressFile === "/deploy-output/mail-address" ||
+    rawAddressFile === "\\deploy-output\\mail-address" ||
+    rawAddressFile === "/deploy-output/mail-address.txt" ||
+    rawAddressFile === "\\deploy-output\\mail-address.txt"
+      ? join(outputDir, "mail-address.txt")
+      : rawAddressFile;
+  mkdirSync(outputDir, { recursive: true });
+  mkdirSync(dirname(addressFile), { recursive: true });
+
+  console.log(`[deploy] network chainId=${chainId} deployer=${deployer.address}`);
+  if (existsSync(addressFile)) {
+    const existingAddress = readFileSync(addressFile, "utf8").trim();
+    if (/^0x[a-fA-F0-9]{40}$/.test(existingAddress)) {
+      const code = await ethers.provider.getCode(existingAddress);
+      if (code && code !== "0x" && code.length > 2) {
+        console.log(`[deploy] Contract already deployed at ${existingAddress}, skipping`);
+        return;
+      }
+    }
+  }
 
   const PrivateMail = await ethers.getContractFactory("PrivateMail");
   const mail = await PrivateMail.deploy();
   await mail.waitForDeployment();
   const address = await mail.getAddress();
 
-  console.log(`[deploy] PrivateMail address=${address}`);
+  console.log(`[deploy] PrivateMail deployed at ${address}`);
 
-  const outputDir = process.env.DEPLOY_OUTPUT_DIR ?? resolve(process.cwd(), "..", "deploy-output");
-  const addressFile = process.env.MAIL_CONTRACT_ADDRESS_FILE ?? resolve(outputDir, "mail-address");
-  const artifactsBase = process.env.CONTRACTS_ARTIFACTS_PATH ?? resolve(process.cwd(), "artifacts");
-  const artifactsPath = resolve(artifactsBase, "contracts", "PrivateMail.sol", "PrivateMail.json");
-  const artifact = JSON.parse(readFileSync(artifactsPath, "utf8"));
-
-  mkdirSync(dirname(addressFile), { recursive: true });
-  writeFileSync(addressFile, address, "utf8");
-
-  const contractsJson = {
-    chainId: Number(chainId),
-    PrivateMail: { address, abi: artifact.abi },
-  };
-  const contractsPath = join(outputDir, "contracts.json");
-  writeFileSync(contractsPath, JSON.stringify(contractsJson, null, 2), "utf8");
-  console.log(`[deploy] wrote ${addressFile} and ${contractsPath}`);
+  writeFileSync(addressFile, address.trim(), "utf8");
+  console.log(`[deploy] wrote ${addressFile}`);
 }
 
 main().catch((err) => {

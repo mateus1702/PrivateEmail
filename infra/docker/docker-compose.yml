@@ -2,44 +2,24 @@
 # PREREQUISITE: External ERC-4337 infrastructure (RPC, bundler, paymaster) must be running.
 # Usage (from project5 root): docker compose -f infra/docker/docker-compose.yml --env-file .env up -d
 #
-# Services: contract-deployer-project5, frontend-project5
+# Services: frontend-project5
+# Set all VITE_* vars in .env (including VITE_PRIVATE_MAIL_ADDRESS from deploy-output/mail-address.txt after deploy).
 
 services:
-  contract-deployer-project5:
-    build:
-      context: ../..
-      dockerfile: services/contract-deployer/Dockerfile
-    environment:
-      RPC_URL: ${RPC_URL}
-      DEPLOY_OUTPUT_DIR: ${DEPLOY_OUTPUT_DIR:-/deploy-output}
-      MAIL_CONTRACT_ADDRESS_FILE: ${MAIL_CONTRACT_ADDRESS_FILE:-/deploy-output/mail-address}
-      DEPLOYER_MNEMONIC: ${DEPLOYER_MNEMONIC}
-      DEPLOYER_PRIVATE_KEY: ${DEPLOYER_PRIVATE_KEY:-}
-    volumes:
-      - deploy-output:/deploy-output
-    restart: "no"
-
   frontend-project5:
     build:
       context: ../..
       dockerfile: services/frontend/Dockerfile
+      args:
+        VITE_PRIVATE_MAIL_ADDRESS: ${VITE_PRIVATE_MAIL_ADDRESS}
+        VITE_RPC_URL: ${VITE_RPC_URL}
+        VITE_BUNDLER_URL: ${VITE_BUNDLER_URL}
+        VITE_PAYMASTER_API_URL: ${VITE_PAYMASTER_API_URL}
+        VITE_CHAIN_ID: ${VITE_CHAIN_ID}
+        VITE_ENTRYPOINT_ADDRESS: ${VITE_ENTRYPOINT_ADDRESS}
+        VITE_USDC_ADDRESS: ${VITE_USDC_ADDRESS}
+        VITE_ANVIL_WHALE_CANDIDATES: ${VITE_ANVIL_WHALE_CANDIDATES}
+        VITE_ENABLE_ANVIL_WHALE_FUNDING: ${VITE_ENABLE_ANVIL_WHALE_FUNDING}
     ports:
       - "${FRONTEND_PORT:-3002}:3001"
-    environment:
-      RPC_URL: ${RPC_URL}
-      BUNDLER_URL: ${BUNDLER_URL}
-      PAYMASTER_API_URL: ${PAYMASTER_API_URL}
-      ENTRYPOINT_ADDRESS: ${ENTRYPOINT_ADDRESS:-0x0000000071727De22E5E9d8BAf0edAc6f37da032}
-      CHAIN_ID: ${CHAIN_ID:-137}
-      USDC_ADDRESS: ${USDC_ADDRESS:-0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359}
-      ANVIL_WHALE_CANDIDATES: ${ANVIL_WHALE_CANDIDATES:-}
-      ENABLE_ANVIL_WHALE_FUNDING: ${ENABLE_ANVIL_WHALE_FUNDING:-true}
-      CONTRACTS_JSON_PATH: /deploy-output/contracts.json
-    volumes:
-      - deploy-output:/deploy-output
-    depends_on:
-      contract-deployer-project5:
-        condition: service_completed_successfully
 
-volumes:
-  deploy-output: {}

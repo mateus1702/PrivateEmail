@@ -36,19 +36,19 @@ export default defineConfig({
     amoy: {
       type: "http",
       chainType: "l1",
-      url: process.env.RPC_URL ?? "https://rpc-amoy.polygon.technology",
+      url: process.env.CONTRACT_RPC_URL ?? "https://rpc-amoy.polygon.technology",
       chainId: 80002,
-      accounts: process.env.DEPLOYER_PRIVATE_KEY
-        ? [process.env.DEPLOYER_PRIVATE_KEY]
+      accounts: process.env.CONTRACT_DEPLOYER_PRIVATE_KEY
+        ? [process.env.CONTRACT_DEPLOYER_PRIVATE_KEY]
         : [],
     },
     polygon: {
       type: "http",
       chainType: "l1",
-      url: process.env.RPC_URL ?? "https://polygon-rpc.com",
+      url: process.env.CONTRACT_RPC_URL ?? "https://polygon-rpc.com",
       chainId: 137,
-      accounts: process.env.DEPLOYER_PRIVATE_KEY
-        ? [process.env.DEPLOYER_PRIVATE_KEY]
+      accounts: process.env.CONTRACT_DEPLOYER_PRIVATE_KEY
+        ? [process.env.CONTRACT_DEPLOYER_PRIVATE_KEY]
         : [],
     },
   },

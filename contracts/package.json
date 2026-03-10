@@ -5,7 +5,9 @@
   "scripts": {
     "build": "npx hardhat compile",
     "test": "npx hardhat test",
-    "deploy:localhost": "npx hardhat run scripts/deploy.ts --network localhost"
+    "deploy:localhost": "npx hardhat run scripts/deploy.ts --network localhost",
+    "deploy:amoy": "npx hardhat run scripts/deploy.ts --network amoy",
+    "deploy:polygon": "npx hardhat run scripts/deploy.ts --network polygon"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.0.3",

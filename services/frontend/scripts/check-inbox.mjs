@@ -10,22 +10,22 @@ import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const recipient = process.argv[2];
-const rpcUrl = process.argv[3] ?? "http://127.0.0.1:8545";
+const rpcUrl = process.argv[3] ?? process.env.TOOLS_RPC_URL ?? "http://127.0.0.1:8545";
 
 if (!recipient || !/^0x[a-fA-F0-9]{40}$/.test(recipient)) {
   console.error("Usage: node scripts/check-inbox.mjs <0x...recipient> [rpc_url]");
   process.exit(1);
 }
 
+const projectRoot = join(__dirname, "../..");
+const mailAddressFile = process.env.TOOLS_MAIL_ADDRESS_FILE ?? join(projectRoot, "deploy-output", "mail-address.txt");
 let mailAddress = "0xFa9f8B5D7Ca9122447c6E963fd056aED3d0AcA55";
-let chainId = 31337;
+let chainId = parseInt(process.env.TOOLS_CHAIN_ID ?? process.env.VITE_CHAIN_ID ?? "31337", 10);
 try {
-  const cfgPath = join(__dirname, "../public/config/contracts.json");
-  const cfg = JSON.parse(readFileSync(cfgPath, "utf8"));
-  if (cfg.PrivateMail?.address) mailAddress = cfg.PrivateMail.address;
-  if (cfg.chainId) chainId = cfg.chainId;
+  const addr = readFileSync(mailAddressFile, "utf8").trim();
+  if (addr && /^0x[a-fA-F0-9]{40}$/.test(addr)) mailAddress = addr;
 } catch {
-  // use defaults
+  // use default
 }
 
 const PRIVATE_MAIL_ABI = [

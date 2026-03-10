@@ -95,6 +95,21 @@ yarn dev
 
 4. **Open:** http://localhost:5174
 
+### Docker (static frontend)
+
+1. Ensure AA infrastructure is running.
+2. Run Hardhat deploy (writes `deploy-output/mail-address.txt`):
+   ```bash
+   cd contracts && npm run build && npm run deploy:localhost
+   ```
+   For Polygon/Amoy: `npm run deploy:polygon` or `npm run deploy:amoy` (set `CONTRACT_RPC_URL` and `CONTRACT_DEPLOYER_PRIVATE_KEY` in `.env`).
+3. Set `VITE_PRIVATE_MAIL_ADDRESS` in `.env` (copy from `deploy-output/mail-address.txt`) and all other `VITE_*` vars (see `.env.example`).
+4. Build and start frontend:
+   ```bash
+   docker compose -f infra/docker/docker-compose.yml --env-file .env up -d frontend-project5
+   ```
+5. Open http://localhost:3002 (or `FRONTEND_PORT`).
+
 ### Test the Flow
 ```bash
 cd project5/tools/send-receive-test
@@ -121,14 +136,15 @@ To run the frontend outside Docker with hot reload:
 
 1. Start external AA infrastructure (RPC, bundler, paymaster). For local Anvil + project4 stack, run project4's compose first.
 2. Deploy contracts:
-   - Option A: `docker compose -f infra/docker/docker-compose.yml --env-file .env run --rm contract-deployer-project5`
-   - Option B: `cd contracts && npm run build && RPC_URL=http://127.0.0.1:8545 npx hardhat run scripts/deploy.ts --network localhost`
-3. Copy `deploy-output/contracts.json` to `services/frontend/public/config/contracts.json`.
+   ```bash
+   cd contracts && npm run deploy:localhost
+   ```
+3. Create `services/frontend/.env` from `services/frontend/.env.example` and set `VITE_PRIVATE_MAIL_ADDRESS` (copy from `deploy-output/mail-address.txt`). All `VITE_*` vars are required.
 4. Run frontend:
    ```bash
    cd services/frontend && yarn install && yarn dev
    ```
-5. Edit `services/frontend/public/config/env.json` to point to local endpoints if needed. The Vite dev server proxies `127.0.0.1:3000` (paymaster) and `127.0.0.1:4337` (bundler) to avoid CORS when the frontend runs on a different origin.
+5. The frontend calls RPC, bundler, and paymaster directly from the browser. Endpoints must support CORS from the frontend origin.
 
 ### Registration flow (local Anvil)
 
@@ -140,33 +156,37 @@ To run the frontend outside Docker with hot reload:
 
 ## Configuration
 
-See `.env.example` for all options. Key variables:
+See `.env.example` for all options. Frontend uses `VITE_*` vars only (no defaults). Key variables:
 
 | Variable | Description |
 |----------|-------------|
-| `RPC_URL` | Chain RPC endpoint |
-| `BUNDLER_URL` | ERC-4337 bundler URL |
-| `PAYMASTER_API_URL` | Paymaster API URL |
-| `ENTRYPOINT_ADDRESS` | ERC-4337 EntryPoint contract address |
+| `VITE_PRIVATE_MAIL_ADDRESS` | PrivateMail contract address (from `deploy-output/mail-address.txt` after deploy) |
+| `VITE_RPC_URL` | Chain RPC endpoint |
+| `VITE_BUNDLER_URL` | ERC-4337 bundler URL |
+| `VITE_PAYMASTER_API_URL` | Paymaster API URL |
+| `VITE_CHAIN_ID` | Chain ID (137 = Polygon, 80002 = Amoy) |
 
 ## Architecture
 
 - **Smart contracts**: Register encryption public keys, store encrypted messages on-chain.
-- **Contract deployer**: Deploys contracts and writes addresses to `deploy-output/contracts.json`.
-- **Frontend**: Vite + React app; loads runtime config, derives keys client-side, interacts with contracts via AA.
+- **Hardhat deploy**: Deploys contracts and writes address to `deploy-output/mail-address.txt` (run `npm run deploy:localhost` from `contracts/`).
+- **Frontend**: Cached static site served by nginx. Config from `VITE_*` env vars only (no generated files). Browser calls RPC, bundler, and paymaster directly; those endpoints must allow CORS.
 
 ## Configuration Reference
 
 | Variable | Description |
 |----------|-------------|
-| `RPC_URL` | Chain RPC (e.g. `http://127.0.0.1:8545` or `http://host.docker.internal:8545` from Docker) |
-| `BUNDLER_URL` | ERC-4337 bundler HTTP endpoint |
-| `PAYMASTER_API_URL` | Paymaster API base URL for sponsor quotes |
-| `ENTRYPOINT_ADDRESS` | ERC-4337 EntryPoint v0.7 address |
-| `CHAIN_ID` | Chain ID (137 = Polygon, 80002 = Amoy) |
-| `USDC_ADDRESS` | USDC token for paymaster charges (default: Polygon USDC) |
-| `ANVIL_WHALE_CANDIDATES` | CSV of whale addresses for dev funding (Anvil only) |
-| `ENABLE_ANVIL_WHALE_FUNDING` | Show "Load from whale" when RPC supports `anvil_impersonateAccount` |
+| `VITE_PRIVATE_MAIL_ADDRESS` | PrivateMail contract address (required; from `deploy-output/mail-address.txt`) |
+| `VITE_RPC_URL` | Chain RPC (e.g. `http://127.0.0.1:8545` or `http://host.docker.internal:8545` from Docker) |
+| `VITE_BUNDLER_URL` | ERC-4337 bundler HTTP endpoint |
+| `VITE_PAYMASTER_API_URL` | Paymaster API base URL for sponsor quotes |
+| `VITE_CHAIN_ID` | Chain ID (137 = Polygon, 80002 = Amoy) |
+| `VITE_ENTRYPOINT_ADDRESS` | ERC-4337 EntryPoint v0.7 address |
+| `VITE_USDC_ADDRESS` | USDC token for paymaster charges |
+| `VITE_ANVIL_WHALE_CANDIDATES` | CSV of whale addresses for dev funding (Anvil only); can be empty for prod |
+| `VITE_ENABLE_ANVIL_WHALE_FUNDING` | "true" or "false"; show "Load from whale" when RPC supports `anvil_impersonateAccount` |
+
+**Docker static frontend**: nginx serves pre-built static assets with caching. Set all `VITE_*` vars in `.env` (compose passes them as build args). Build order: 1) deploy contracts (writes `deploy-output/mail-address.txt`), 2) set `VITE_PRIVATE_MAIL_ADDRESS` and other `VITE_*` in `.env`, 3) build frontend image. The browser calls RPC, bundler, and paymaster directly; those endpoints must allow CORS from the frontend origin.
 
 **Docker networking**: When project5 runs in Docker and must reach services on the host (e.g. RPC at `127.0.0.1:8545`), use `http://host.docker.internal:8545`.
 

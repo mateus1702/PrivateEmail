@@ -421,6 +421,28 @@
   display: flex;
   align-items: center;
   gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.username-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.username-input {
+  width: 140px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--border-radius);
+  color: inherit;
+}
+
+.username-row button {
+  padding: 0.5rem 1rem;
+  min-width: auto;
 }
 
 .logged-error {
@@ -430,6 +452,97 @@
   right: 2rem;
   z-index: 1001;
   animation: slideIn 0.3s ease-out;
+}
+
+/* Inbox area */
+.inbox-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6rem 2rem 5rem;
+}
+
+.inbox-title {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.25rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.inbox-loading,
+.inbox-empty {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.95rem;
+}
+
+.inbox-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.inbox-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.5rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.inbox-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateX(4px);
+}
+
+.inbox-sender {
+  font-size: 0.9rem;
+  font-family: monospace;
+}
+
+.inbox-time {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.inbox-load-more {
+  margin-top: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--border-radius);
+  color: inherit;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.inbox-load-more:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.inbox-load-more:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.message-sender {
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+  font-family: monospace;
+  word-break: break-all;
+}
+
+.message-content {
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--border-radius);
+  margin-bottom: 1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* Animations */

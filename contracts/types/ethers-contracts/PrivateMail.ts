@@ -6,36 +6,70 @@ import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, Typed
   
 export declare namespace PrivateMail {
       
-    export type MessageStruct = {sender: AddressLike, recipient: AddressLike, ciphertext: BytesLike, timestamp: BigNumberish, contentHash: BytesLike}
+    export type MessageStruct = {sender: AddressLike, recipient: AddressLike, ciphertext: BytesLike, ciphertextRef: BigNumberish, timestamp: BigNumberish, contentHash: BytesLike}
 
-    export type MessageStructOutput = [sender: string, recipient: string, ciphertext: string, timestamp: bigint, contentHash: string] & {sender: string, recipient: string, ciphertext: string, timestamp: bigint, contentHash: string }
+    export type MessageStructOutput = [sender: string, recipient: string, ciphertext: string, ciphertextRef: bigint, timestamp: bigint, contentHash: string] & {sender: string, recipient: string, ciphertext: string, ciphertextRef: bigint, timestamp: bigint, contentHash: string }
   
     }
 
   export interface PrivateMailInterface extends Interface {
-    getFunction(nameOrSignature: "encryptionPublicKeys" | "getMessage" | "getPublicKey" | "hasRegisteredKey" | "isRegistered" | "messages" | "nextMessageId" | "registerPublicKey" | "sendMessage"): FunctionFragment;
+    getFunction(nameOrSignature: "CIPHER_TEXT_INLINE_MAX" | "MESSAGES_PER_PAGE" | "PREV_PAGE_NONE" | "addressToUsername" | "encryptionPublicKeys" | "getAddressForUsername" | "getLargeCiphertext" | "getMessage" | "getPage" | "getPageWithMessages" | "getPublicKey" | "getRecipientHeadPageId" | "getUsernameHash" | "hasRegisteredKey" | "isRegistered" | "largeCiphertexts" | "messages" | "nextCiphertextRefId" | "nextMessageId" | "nextPageId" | "pages" | "recipientHeadPageId" | "registerPublicKey" | "registerUsername" | "sendMessage" | "usernameToAddress"): FunctionFragment;
 
-    getEvent(nameOrSignatureOrTopic: "MessageSent" | "PublicKeyRegistered"): EventFragment;
+    getEvent(nameOrSignatureOrTopic: "MessageSent" | "PublicKeyRegistered" | "UsernameRegistered"): EventFragment;
 
-    encodeFunctionData(functionFragment: 'encryptionPublicKeys', values: [AddressLike]): string;
+    encodeFunctionData(functionFragment: 'CIPHER_TEXT_INLINE_MAX', values?: undefined): string;
+encodeFunctionData(functionFragment: 'MESSAGES_PER_PAGE', values?: undefined): string;
+encodeFunctionData(functionFragment: 'PREV_PAGE_NONE', values?: undefined): string;
+encodeFunctionData(functionFragment: 'addressToUsername', values: [AddressLike]): string;
+encodeFunctionData(functionFragment: 'encryptionPublicKeys', values: [AddressLike]): string;
+encodeFunctionData(functionFragment: 'getAddressForUsername', values: [string]): string;
+encodeFunctionData(functionFragment: 'getLargeCiphertext', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'getMessage', values: [BigNumberish]): string;
+encodeFunctionData(functionFragment: 'getPage', values: [BigNumberish]): string;
+encodeFunctionData(functionFragment: 'getPageWithMessages', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'getPublicKey', values: [AddressLike]): string;
+encodeFunctionData(functionFragment: 'getRecipientHeadPageId', values: [AddressLike]): string;
+encodeFunctionData(functionFragment: 'getUsernameHash', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'hasRegisteredKey', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'isRegistered', values: [AddressLike]): string;
+encodeFunctionData(functionFragment: 'largeCiphertexts', values: [BigNumberish]): string;
 encodeFunctionData(functionFragment: 'messages', values: [BigNumberish]): string;
+encodeFunctionData(functionFragment: 'nextCiphertextRefId', values?: undefined): string;
 encodeFunctionData(functionFragment: 'nextMessageId', values?: undefined): string;
+encodeFunctionData(functionFragment: 'nextPageId', values?: undefined): string;
+encodeFunctionData(functionFragment: 'pages', values: [BigNumberish]): string;
+encodeFunctionData(functionFragment: 'recipientHeadPageId', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'registerPublicKey', values: [BytesLike]): string;
+encodeFunctionData(functionFragment: 'registerUsername', values: [string]): string;
 encodeFunctionData(functionFragment: 'sendMessage', values: [AddressLike, BytesLike, BytesLike]): string;
+encodeFunctionData(functionFragment: 'usernameToAddress', values: [BytesLike]): string;
 
-    decodeFunctionResult(functionFragment: 'encryptionPublicKeys', data: BytesLike): Result;
+    decodeFunctionResult(functionFragment: 'CIPHER_TEXT_INLINE_MAX', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'MESSAGES_PER_PAGE', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'PREV_PAGE_NONE', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'addressToUsername', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'encryptionPublicKeys', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'getAddressForUsername', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'getLargeCiphertext', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'getMessage', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'getPage', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'getPageWithMessages', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'getPublicKey', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'getRecipientHeadPageId', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'getUsernameHash', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'hasRegisteredKey', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'isRegistered', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'largeCiphertexts', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'messages', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'nextCiphertextRefId', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'nextMessageId', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'nextPageId', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'pages', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'recipientHeadPageId', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'registerPublicKey', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'registerUsername', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'sendMessage', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'usernameToAddress', data: BytesLike): Result;
   }
 
   
@@ -55,6 +89,18 @@ decodeFunctionResult(functionFragment: 'sendMessage', data: BytesLike): Result;
       export type InputTuple = [owner: AddressLike, pubKey: BytesLike];
       export type OutputTuple = [owner: string, pubKey: string];
       export interface OutputObject {owner: string, pubKey: string };
+      export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
+      export type Filter = TypedDeferredTopicFilter<Event>
+      export type Log = TypedEventLog<Event>
+      export type LogDescription = TypedLogDescription<Event>
+    }
+
+  
+
+    export namespace UsernameRegisteredEvent {
+      export type InputTuple = [owner: AddressLike, username: string];
+      export type OutputTuple = [owner: string, username: string];
+      export interface OutputObject {owner: string, username: string };
       export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>
       export type Filter = TypedDeferredTopicFilter<Event>
       export type Log = TypedEventLog<Event>
@@ -97,8 +143,56 @@ decodeFunctionResult(functionFragment: 'sendMessage', data: BytesLike): Result;
 
     
     
+    CIPHER_TEXT_INLINE_MAX: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >
+    
+
+    
+    MESSAGES_PER_PAGE: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >
+    
+
+    
+    PREV_PAGE_NONE: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >
+    
+
+    
+    addressToUsername: TypedContractMethod<
+      [arg0: AddressLike, ],
+      [string],
+      'view'
+    >
+    
+
+    
     encryptionPublicKeys: TypedContractMethod<
       [arg0: AddressLike, ],
+      [string],
+      'view'
+    >
+    
+
+    
+    getAddressForUsername: TypedContractMethod<
+      [username: string, ],
+      [string],
+      'view'
+    >
+    
+
+    
+    getLargeCiphertext: TypedContractMethod<
+      [refId: BigNumberish, ],
       [string],
       'view'
     >
@@ -113,7 +207,39 @@ decodeFunctionResult(functionFragment: 'sendMessage', data: BytesLike): Result;
     
 
     
+    getPage: TypedContractMethod<
+      [pageId: BigNumberish, ],
+      [[bigint[], bigint, bigint] & {messageIds: bigint[], count: bigint, prevPageIdForRecipient: bigint }],
+      'view'
+    >
+    
+
+    
+    getPageWithMessages: TypedContractMethod<
+      [pageId: BigNumberish, ],
+      [[bigint, bigint, PrivateMail.MessageStructOutput[]] & {count: bigint, prevPageIdForRecipient: bigint, pageMessages: PrivateMail.MessageStructOutput[] }],
+      'view'
+    >
+    
+
+    
     getPublicKey: TypedContractMethod<
+      [owner: AddressLike, ],
+      [string],
+      'view'
+    >
+    
+
+    
+    getRecipientHeadPageId: TypedContractMethod<
+      [recipient: AddressLike, ],
+      [bigint],
+      'view'
+    >
+    
+
+    
+    getUsernameHash: TypedContractMethod<
       [owner: AddressLike, ],
       [string],
       'view'
@@ -137,9 +263,25 @@ decodeFunctionResult(functionFragment: 'sendMessage', data: BytesLike): Result;
     
 
     
+    largeCiphertexts: TypedContractMethod<
+      [arg0: BigNumberish, ],
+      [string],
+      'view'
+    >
+    
+
+    
     messages: TypedContractMethod<
       [arg0: BigNumberish, ],
-      [[string, string, string, bigint, string] & {sender: string, recipient: string, ciphertext: string, timestamp: bigint, contentHash: string }],
+      [[string, string, string, bigint, bigint, string] & {sender: string, recipient: string, ciphertext: string, ciphertextRef: bigint, timestamp: bigint, contentHash: string }],
+      'view'
+    >
+    
+
+    
+    nextCiphertextRefId: TypedContractMethod<
+      [],
+      [bigint],
       'view'
     >
     
@@ -147,6 +289,30 @@ decodeFunctionResult(functionFragment: 'sendMessage', data: BytesLike): Result;
     
     nextMessageId: TypedContractMethod<
       [],
+      [bigint],
+      'view'
+    >
+    
+
+    
+    nextPageId: TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >
+    
+
+    
+    pages: TypedContractMethod<
+      [arg0: BigNumberish, ],
+      [[bigint, bigint] & {count: bigint, prevPageIdForRecipient: bigint }],
+      'view'
+    >
+    
+
+    
+    recipientHeadPageId: TypedContractMethod<
+      [arg0: AddressLike, ],
       [bigint],
       'view'
     >
@@ -161,6 +327,14 @@ decodeFunctionResult(functionFragment: 'sendMessage', data: BytesLike): Result;
     
 
     
+    registerUsername: TypedContractMethod<
+      [username: string, ],
+      [void],
+      'nonpayable'
+    >
+    
+
+    
     sendMessage: TypedContractMethod<
       [recipient: AddressLike, ciphertext: BytesLike, contentHash: BytesLike, ],
       [bigint],
@@ -168,11 +342,49 @@ decodeFunctionResult(functionFragment: 'sendMessage', data: BytesLike): Result;
     >
     
 
+    
+    usernameToAddress: TypedContractMethod<
+      [arg0: BytesLike, ],
+      [string],
+      'view'
+    >
+    
+
 
     getFunction<T extends ContractMethod = ContractMethod>(key: string | FunctionFragment): T;
 
-    getFunction(nameOrSignature: 'encryptionPublicKeys'): TypedContractMethod<
+    getFunction(nameOrSignature: 'CIPHER_TEXT_INLINE_MAX'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >;
+getFunction(nameOrSignature: 'MESSAGES_PER_PAGE'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >;
+getFunction(nameOrSignature: 'PREV_PAGE_NONE'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >;
+getFunction(nameOrSignature: 'addressToUsername'): TypedContractMethod<
       [arg0: AddressLike, ],
+      [string],
+      'view'
+    >;
+getFunction(nameOrSignature: 'encryptionPublicKeys'): TypedContractMethod<
+      [arg0: AddressLike, ],
+      [string],
+      'view'
+    >;
+getFunction(nameOrSignature: 'getAddressForUsername'): TypedContractMethod<
+      [username: string, ],
+      [string],
+      'view'
+    >;
+getFunction(nameOrSignature: 'getLargeCiphertext'): TypedContractMethod<
+      [refId: BigNumberish, ],
       [string],
       'view'
     >;
@@ -181,7 +393,27 @@ getFunction(nameOrSignature: 'getMessage'): TypedContractMethod<
       [PrivateMail.MessageStructOutput],
       'view'
     >;
+getFunction(nameOrSignature: 'getPage'): TypedContractMethod<
+      [pageId: BigNumberish, ],
+      [[bigint[], bigint, bigint] & {messageIds: bigint[], count: bigint, prevPageIdForRecipient: bigint }],
+      'view'
+    >;
+getFunction(nameOrSignature: 'getPageWithMessages'): TypedContractMethod<
+      [pageId: BigNumberish, ],
+      [[bigint, bigint, PrivateMail.MessageStructOutput[]] & {count: bigint, prevPageIdForRecipient: bigint, pageMessages: PrivateMail.MessageStructOutput[] }],
+      'view'
+    >;
 getFunction(nameOrSignature: 'getPublicKey'): TypedContractMethod<
+      [owner: AddressLike, ],
+      [string],
+      'view'
+    >;
+getFunction(nameOrSignature: 'getRecipientHeadPageId'): TypedContractMethod<
+      [recipient: AddressLike, ],
+      [bigint],
+      'view'
+    >;
+getFunction(nameOrSignature: 'getUsernameHash'): TypedContractMethod<
       [owner: AddressLike, ],
       [string],
       'view'
@@ -196,13 +428,38 @@ getFunction(nameOrSignature: 'isRegistered'): TypedContractMethod<
       [boolean],
       'view'
     >;
+getFunction(nameOrSignature: 'largeCiphertexts'): TypedContractMethod<
+      [arg0: BigNumberish, ],
+      [string],
+      'view'
+    >;
 getFunction(nameOrSignature: 'messages'): TypedContractMethod<
       [arg0: BigNumberish, ],
-      [[string, string, string, bigint, string] & {sender: string, recipient: string, ciphertext: string, timestamp: bigint, contentHash: string }],
+      [[string, string, string, bigint, bigint, string] & {sender: string, recipient: string, ciphertext: string, ciphertextRef: bigint, timestamp: bigint, contentHash: string }],
+      'view'
+    >;
+getFunction(nameOrSignature: 'nextCiphertextRefId'): TypedContractMethod<
+      [],
+      [bigint],
       'view'
     >;
 getFunction(nameOrSignature: 'nextMessageId'): TypedContractMethod<
       [],
+      [bigint],
+      'view'
+    >;
+getFunction(nameOrSignature: 'nextPageId'): TypedContractMethod<
+      [],
+      [bigint],
+      'view'
+    >;
+getFunction(nameOrSignature: 'pages'): TypedContractMethod<
+      [arg0: BigNumberish, ],
+      [[bigint, bigint] & {count: bigint, prevPageIdForRecipient: bigint }],
+      'view'
+    >;
+getFunction(nameOrSignature: 'recipientHeadPageId'): TypedContractMethod<
+      [arg0: AddressLike, ],
       [bigint],
       'view'
     >;
@@ -211,14 +468,25 @@ getFunction(nameOrSignature: 'registerPublicKey'): TypedContractMethod<
       [void],
       'nonpayable'
     >;
+getFunction(nameOrSignature: 'registerUsername'): TypedContractMethod<
+      [username: string, ],
+      [void],
+      'nonpayable'
+    >;
 getFunction(nameOrSignature: 'sendMessage'): TypedContractMethod<
       [recipient: AddressLike, ciphertext: BytesLike, contentHash: BytesLike, ],
       [bigint],
       'nonpayable'
     >;
+getFunction(nameOrSignature: 'usernameToAddress'): TypedContractMethod<
+      [arg0: BytesLike, ],
+      [string],
+      'view'
+    >;
 
     getEvent(key: 'MessageSent'): TypedContractEvent<MessageSentEvent.InputTuple, MessageSentEvent.OutputTuple, MessageSentEvent.OutputObject>;
 getEvent(key: 'PublicKeyRegistered'): TypedContractEvent<PublicKeyRegisteredEvent.InputTuple, PublicKeyRegisteredEvent.OutputTuple, PublicKeyRegisteredEvent.OutputObject>;
+getEvent(key: 'UsernameRegistered'): TypedContractEvent<UsernameRegisteredEvent.InputTuple, UsernameRegisteredEvent.OutputTuple, UsernameRegisteredEvent.OutputObject>;
 
     filters: {
       
@@ -228,6 +496,10 @@ getEvent(key: 'PublicKeyRegistered'): TypedContractEvent<PublicKeyRegisteredEven
 
       'PublicKeyRegistered(address,bytes)': TypedContractEvent<PublicKeyRegisteredEvent.InputTuple, PublicKeyRegisteredEvent.OutputTuple, PublicKeyRegisteredEvent.OutputObject>;
       PublicKeyRegistered: TypedContractEvent<PublicKeyRegisteredEvent.InputTuple, PublicKeyRegisteredEvent.OutputTuple, PublicKeyRegisteredEvent.OutputObject>;
+    
+
+      'UsernameRegistered(address,string)': TypedContractEvent<UsernameRegisteredEvent.InputTuple, UsernameRegisteredEvent.OutputTuple, UsernameRegisteredEvent.OutputObject>;
+      UsernameRegistered: TypedContractEvent<UsernameRegisteredEvent.InputTuple, UsernameRegisteredEvent.OutputTuple, UsernameRegisteredEvent.OutputObject>;
     
     };
   }

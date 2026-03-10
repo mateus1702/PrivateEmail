@@ -1,12 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
-import { loadConfig, loadEnv, type ContractsConfig, type EnvConfig } from "./lib/config";
+import { getConfig, getEnv, type ContractsConfig, type EnvConfig } from "./lib/config";
 import {
   createMailClient,
   getUsdcBalance,
   isRegistered,
+  loadInboxPage,
+  getFullCiphertext,
+  getAddressForUsername,
+  type Message,
 } from "./lib/contracts";
 import {
   submitRegisterPublicKey,
+  submitRegisterUsername,
   submitSendMessage,
   getSmartAccountAddress,
 } from "./lib/aa";
@@ -14,6 +19,7 @@ import {
   deriveAaPrivateKey,
   deriveEncryptionKeyPair,
   encryptWithPublicKey,
+  decryptWithPrivateKey,
   publicKeyToBytes,
   bytesToHex,
   hexToBytes,
@@ -59,6 +65,15 @@ function App() {
   const [isRefreshingSessionBalance, setIsRefreshingSessionBalance] = useState(false);
 
   const [composeModalOpen, setComposeModalOpen] = useState(false);
+  const [inboxPages, setInboxPages] = useState<Message[]>([]);
+  const [inboxNextPageId, setInboxNextPageId] = useState<bigint>(0n);
+  const [inboxHasMore, setInboxHasMore] = useState(true);
+  const [isLoadingInbox, setIsLoadingInbox] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [decryptedContent, setDecryptedContent] = useState<string | null>(null);
+  const [messageModalOpen, setMessageModalOpen] = useState(false);
+  const [usernameInput, setUsernameInput] = useState("");
+  const [isSettingUsername, setIsSettingUsername] = useState(false);
 
   const copyText = useCallback(async (value: string | null) => {
     if (!value) return;
@@ -91,16 +106,12 @@ function App() {
   }, []);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const e = await loadEnv();
-        setEnv(e);
-        const cfg = await loadConfig();
-        setConfig(cfg);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
-      }
-    })();
+    try {
+      setEnv(getEnv());
+      setConfig(getConfig());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
   }, []);
 
   const clearDerivedState = useCallback(() => {
@@ -419,8 +430,12 @@ function App() {
     setSessionAddress(null);
     setSessionOwnerPrivateKeyHex(null);
     setSessionUsdcBalance(null);
+    setInboxPages([]);
+    setInboxNextPageId(0n);
+    setInboxHasMore(true);
     setScreen("login");
     setComposeModalOpen(false);
+    setMessageModalOpen(false);
     clearDerivedState();
   }, [clearDerivedState]);
 
@@ -439,20 +454,130 @@ function App() {
     }
   }, [env, sessionAddress]);
 
+  const handleLoadInbox = useCallback(
+    async (append: boolean) => {
+      if (!config || !env || !sessionAddress) return;
+      setIsLoadingInbox(true);
+      setError(null);
+      try {
+        const pageId = append ? inboxNextPageId : 0n;
+        const page = await loadInboxPage(
+          config,
+          env.VITE_RPC_URL,
+          sessionAddress as Address,
+          pageId
+        );
+        if (append) {
+          setInboxPages((prev) => [...prev, ...page.messages]);
+        } else {
+          setInboxPages(page.messages);
+        }
+        setInboxNextPageId(page.prevPageId);
+        setInboxHasMore(page.hasMore);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setIsLoadingInbox(false);
+      }
+    },
+    [config, env, sessionAddress, inboxNextPageId]
+  );
+
+  useEffect(() => {
+    if (screen === "logged" && sessionAddress && config && env) {
+      handleLoadInbox(false);
+    }
+  }, [screen, sessionAddress, config, env]);
 
   useEffect(() => {
     if (screen !== "logged" || !sessionAddress) return;
     handleRefreshSessionBalance();
+    handleLoadInbox(false);
     const interval = setInterval(() => {
       handleRefreshSessionBalance();
+      handleLoadInbox(false);
     }, INBOX_POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [screen, sessionAddress, handleRefreshSessionBalance]);
+  }, [screen, sessionAddress, handleRefreshSessionBalance, handleLoadInbox]);
+
+  const handleOpenMessage = useCallback(
+    async (msg: Message) => {
+      if (!sessionOwnerPrivateKeyHex || !config || !env) return;
+      setMessageModalOpen(true);
+      setSelectedMessage(msg);
+      setDecryptedContent(null);
+      try {
+        const ciphertext = await getFullCiphertext(
+          config,
+          env.VITE_RPC_URL,
+          msg
+        );
+        const { privateKey } = deriveEncryptionKeyPair(
+          hexToBytes(sessionOwnerPrivateKeyHex)
+        );
+        const combined = hexToBytes(ciphertext);
+        const plaintext = decryptWithPrivateKey(combined, privateKey);
+        setDecryptedContent(new TextDecoder().decode(plaintext));
+      } catch (e) {
+        setDecryptedContent(
+          e instanceof Error ? e.message : "Failed to decrypt"
+        );
+      }
+    },
+    [sessionOwnerPrivateKeyHex, config, env]
+  );
+
+  const handleSetUsername = async () => {
+    if (!config || !env || !usernameInput.trim() || !sessionOwnerPrivateKeyHex) return;
+    const username = usernameInput.trim().toLowerCase();
+    if (username.length < 3 || username.length > 32) {
+      setError("Username must be 3-32 characters");
+      return;
+    }
+    if (!env.VITE_BUNDLER_URL || !env.VITE_PAYMASTER_API_URL) {
+      setError("Bundler and Paymaster URLs required");
+      return;
+    }
+    setIsSettingUsername(true);
+    setError(null);
+    try {
+      const aaConfig = {
+        bundlerUrl: env.VITE_BUNDLER_URL,
+        paymasterApiUrl: env.VITE_PAYMASTER_API_URL,
+        rpcUrl: env.VITE_RPC_URL,
+        entryPointAddress: env.VITE_ENTRYPOINT_ADDRESS ?? "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+        chainId: parseInt(env.VITE_CHAIN_ID, 10),
+        usdcAddress: env.VITE_USDC_ADDRESS ?? "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+      };
+      await submitRegisterUsername(aaConfig, {
+        mailAddress: config.PrivateMail.address as Address,
+        username,
+        ownerPrivateKeyHex: sessionOwnerPrivateKeyHex,
+      });
+      setUsernameInput("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIsSettingUsername(false);
+    }
+  };
+
+  const resolveRecipient = useCallback(
+    async (input: string): Promise<Address | null> => {
+      if (!config || !env) return null;
+      const trimmed = input.trim();
+      if (/^0x[a-fA-F0-9]{40}$/.test(trimmed)) return trimmed as Address;
+      const addr = await getAddressForUsername(config, env.VITE_RPC_URL, trimmed);
+      return addr;
+    },
+    [config, env]
+  );
 
   const handleSend = async () => {
     if (!config || !env || !recipientAddr || !messageText || !sessionOwnerPrivateKeyHex) return;
-    if (!/^0x[a-fA-F0-9]{40}$/.test(recipientAddr)) {
-      setError("Invalid recipient address");
+    const resolved = await resolveRecipient(recipientAddr);
+    if (!resolved) {
+      setError("Invalid recipient: address or username not found");
       return;
     }
     if (!env.VITE_BUNDLER_URL || !env.VITE_PAYMASTER_API_URL) {
@@ -465,17 +590,18 @@ function App() {
     setSendSuccess(null);
     try {
       const recipientPubKey = await createMailClient(config, env.VITE_RPC_URL).read.getPublicKey([
-        recipientAddr as Address,
+        resolved,
       ]);
-      if (!recipientPubKey || recipientPubKey.length === 0) {
+      const pk = recipientPubKey as string | Uint8Array | unknown;
+      if (!pk || (typeof pk === "string" ? pk.length === 0 : (pk as Uint8Array).length === 0)) {
         setError("Recipient has not registered a public key");
         return;
       }
       const plaintext = new TextEncoder().encode(messageText);
       const recipPub =
-        typeof recipientPubKey === "string"
-          ? hexToBytes(recipientPubKey)
-          : new Uint8Array(recipientPubKey as ArrayBuffer);
+        typeof pk === "string"
+          ? hexToBytes(pk as `0x${string}`)
+          : new Uint8Array(pk as ArrayBuffer);
       const { ciphertext } = encryptWithPublicKey(plaintext, recipPub);
       const contentHash = keccak256(plaintext);
 
@@ -490,7 +616,7 @@ function App() {
       const ciphertextHex = bytesToHex(ciphertext) as `0x${string}`;
       const hash = await submitSendMessage(aaConfig, {
         mailAddress: config.PrivateMail.address as Address,
-        recipient: recipientAddr as Address,
+        recipient: resolved,
         ciphertextHex,
         contentHash,
         ownerPrivateKeyHex: sessionOwnerPrivateKeyHex,
@@ -510,7 +636,7 @@ function App() {
       <div className="app">
         <h1>Private Mail</h1>
         <p className="error">{error}</p>
-        <p>Ensure config is available at /config/contracts.json</p>
+        <p>Set all required VITE_* env vars in .env (see .env.example).</p>
       </div>
     );
   }
@@ -648,20 +774,97 @@ function App() {
           </div>
         </div>
         <div className="logged-footer-actions">
-          <button onClick={handleRefreshSessionBalance} disabled={isRefreshingSessionBalance}>
-            {isRefreshingSessionBalance ? "Refreshing…" : "Refresh"}
+          <div className="username-row">
+            <input
+              placeholder="Username (3-32 chars)"
+              value={usernameInput}
+              onChange={(e) => setUsernameInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && void handleSetUsername()}
+              className="username-input"
+            />
+            <button
+              onClick={() => void handleSetUsername()}
+              disabled={isSettingUsername || !usernameInput.trim()}
+            >
+              {isSettingUsername ? "Setting…" : "Set"}
+            </button>
+          </div>
+          <button
+            onClick={() => {
+              void handleRefreshSessionBalance();
+              void handleLoadInbox(false);
+            }}
+            disabled={isRefreshingSessionBalance || isLoadingInbox}
+          >
+            {isRefreshingSessionBalance || isLoadingInbox ? "Refreshing…" : "Refresh"}
           </button>
           <button onClick={() => setComposeModalOpen(true)}>Compose</button>
           <button onClick={handleLogout}>Logout</button>
         </div>
       </footer>
 
+      <div className="inbox-area">
+        <h3 className="inbox-title">Inbox</h3>
+        {isLoadingInbox && inboxPages.length === 0 ? (
+          <p className="inbox-loading">Loading…</p>
+        ) : inboxPages.length === 0 ? (
+          <p className="inbox-empty">No messages</p>
+        ) : (
+          <ul className="inbox-list">
+            {inboxPages.map((msg, i) => (
+              <li
+                key={i}
+                className="inbox-item"
+                onClick={() => void handleOpenMessage(msg)}
+              >
+                <span className="inbox-sender">
+                  From: {msg.sender.slice(0, 10)}…{msg.sender.slice(-8)}
+                </span>
+                <span className="inbox-time">
+                  {new Date(Number(msg.timestamp) * 1000).toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {inboxHasMore && (
+          <button
+            className="inbox-load-more"
+            onClick={() => void handleLoadInbox(true)}
+            disabled={isLoadingInbox}
+          >
+            {isLoadingInbox ? "Loading…" : "Load more"}
+          </button>
+        )}
+      </div>
+
+      {messageModalOpen && selectedMessage && (
+        <div className="modal-overlay" onClick={() => setMessageModalOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="modal-title">Message</h2>
+            <p className="message-sender">
+              From: {selectedMessage.sender}
+            </p>
+            <div className="message-content">
+              {decryptedContent ?? "Decrypting…"}
+            </div>
+            <button
+              type="button"
+              className="modal-close-btn"
+              onClick={() => setMessageModalOpen(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
       {composeModalOpen && (
         <div className="modal-overlay" onClick={() => setComposeModalOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="modal-title">Compose</h2>
             <input
-              placeholder="Recipient address"
+              placeholder="Recipient (address or username)"
               value={recipientAddr}
               onChange={(e) => setRecipientAddr(e.target.value)}
             />

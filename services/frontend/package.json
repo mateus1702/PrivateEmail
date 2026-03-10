@@ -7,9 +7,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:static": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "serve": "node server.js"
+    "preview": "vite preview"
   },
   "dependencies": {
     "permissionless": "^0.2.25",

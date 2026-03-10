@@ -1,41 +1,67 @@
 # Send-Receive Test
 
-End-to-end test: create 2 accounts, register both, send a message, receive it.
+End-to-end test for the PrivateMail contract: sends an encrypted message from one account to another, then fetches and decrypts it to verify the full flow.
 
-## Prereqs
+## Prerequisites
 
-1. AA stack running: Anvil, bundler, paymaster
-2. PrivateMail deployed; copy `deploy-output/contracts.json` to `services/frontend/public/config/contracts.json`
-3. **Polygon fork required**: Start Anvil with `--fork-url https://polygon-rpc.com` so USDC and whale balances exist
-4. **Chain ID match**: Set `CHAIN_ID=137` if your AA stack (bundler, paymaster) expects Polygon; or use 31337 if using local Anvil chain with matching AA deployment
-5. **Paymaster whitelist**: Ensure the paymaster accepts calls to the PrivateMail contract address. If using project4's paymaster, it may need to be updated to whitelist the PrivateMail contract
+1. **Contract deployed** – run from project root:
+   ```bash
+   cd contracts && npm run deploy:localhost
+   ```
 
-## Run
+2. **Local node running** – Hardhat node (or compatible) on port 8545 with funded accounts from the test mnemonic.
+
+3. **Environment** – `.env` in project root (see TOOLS section). Required: all `TOOLS_*` vars plus `CONTRACT_DEPLOYER_MNEMONIC`.
+
+## Usage
+
+From the tool directory:
 
 ```bash
 cd tools/send-receive-test
-pnpm install
-pnpm test
+npm install
+npm run run
 ```
 
-## Env (optional)
+With optional overrides:
 
-| Var | Default |
-|-----|---------|
-| RPC_URL | http://127.0.0.1:8545 |
-| BUNDLER_URL | http://127.0.0.1:4337 |
-| PAYMASTER_URL | http://127.0.0.1:3000 |
-| USDC_ADDRESS | 0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359 |
-| CHAIN_ID | From contracts.json, else 137 (Polygon fork) |
-| USDC_FUND_AMOUNT | 10 |
+```bash
+MESSAGE="Custom test message" npm run run
+TOOLS_RPC_URL=http://localhost:8545 npm run run
+npm run run -- --message "Custom text" --rpc http://localhost:8545
+```
 
-For Polygon fork, set `CHAIN_ID=137` so it matches the fork.
+## What It Does
 
-## Flow
+1. Loads config from project root `.env` and `deploy-output/mail-address.txt`
+2. Derives sender (account 0) and recipient (account 1) from mnemonic
+3. Registers both with `registerPublicKey` if not already registered
+4. Encrypts the message with the recipient’s public key (X25519 + XChaCha20-Poly1305)
+5. Sends via `sendMessage(recipient, ciphertext, contentHash)`
+6. Fetches the latest message from the recipient’s inbox
+7. Decrypts and verifies `keccak256(decrypted) === contentHash`
+8. Prints `SUCCESS: Sent and received message: "<plaintext>"`
 
-1. Load config from `services/frontend/public/config/contracts.json`
-2. Create alice (Anvil #0) and bob (Anvil #1) SimpleAccounts
-3. Fund both with USDC via whale impersonation
-4. Register both with PrivateMail via AA (approve + registerPublicKey)
-5. Send message from alice to bob via AA sendMessage
-6. Query MessageSent events and getMessage to verify receive
+## Anvil / Polygon Fork
+
+When running against an Anvil node (e.g. `anvil --fork-url <polygon_rpc>`), the test detects Anvil and automatically:
+
+1. **Funds ETH** – sets 1 ETH balance on sender and recipient so they can pay gas
+2. **Funds USDC from whales** – impersonates known USDC holders and transfers 10 USDC to each account (for paymaster/AA scenarios or future use)
+
+Whale candidates and USDC address can be overridden via env:
+
+| Env var | Description |
+|--------|-------------|
+| `TOOLS_USDC_ADDRESS` | USDC token address (or `VITE_USDC_ADDRESS`) |
+| `TOOLS_ANVIL_WHALE_CANDIDATES` | Comma-separated whale addresses |
+| `TOOLS_USDC_FUND_AMOUNT` | USDC amount (6 decimals) to fund each account |
+
+## Configuration
+
+| Env var | Description |
+|--------|-------------|
+| `TOOLS_RPC_URL` | Chain RPC URL |
+| `TOOLS_CHAIN_ID` | Chain ID |
+| `TOOLS_MAIL_ADDRESS_FILE` | Path to contract address file |
+| `CONTRACT_DEPLOYER_MNEMONIC` | Mnemonic for sender/recipient |

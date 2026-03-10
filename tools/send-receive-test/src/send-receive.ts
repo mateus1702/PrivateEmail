@@ -1,551 +1,535 @@
+#!/usr/bin/env node
 /**
- * Test: Create 2 accounts, register both, send a message from one to the other, receive it.
- * Prereqs: AA stack (anvil, bundler, paymaster) + contract deployed.
- *
- * Run: npm run test (from tools/send-receive-test)
- * Env: RPC_URL, BUNDLER_URL, PAYMASTER_URL, USDC_ADDRESS, CHAIN_ID (optional)
+ * Send-receive test: end-to-end encrypted message via PrivateMail contract.
+ * Registers sender and recipient, sends a message, fetches and decrypts it.
+ * On Anvil (e.g. Polygon fork), funds test accounts with USDC from whales.
+ * Usage: npm run run [--message "optional text"]
  */
-import { createSmartAccountClient } from "permissionless";
-import { createPimlicoClient } from "permissionless/clients/pimlico";
-import { toSimpleSmartAccount } from "permissionless/accounts";
-import {
-  createPublicClient,
-  createTestClient,
-  defineChain,
-  encodeFunctionData,
-  getContract,
-  http,
-  keccak256,
-  parseAbi,
-  parseUnits,
-  toHex,
-  type Address,
-} from "viem";
-import { entryPoint07Address } from "viem/account-abstraction";
-import { privateKeyToAccount } from "viem/accounts";
-import { readFileSync } from "fs";
+import { config } from "dotenv";
+import { readFileSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { mnemonicToSeedSync } from "@scure/bip39";
+import { HDKey } from "@scure/bip32";
+import {
+  createPublicClient,
+  createWalletClient,
+  getContract,
+  encodeFunctionData,
+  http,
+  parseUnits,
+  keccak256,
+  type Address,
+} from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import {
+  deriveEncryptionKeyPair,
+  encryptWithPublicKey,
+  decryptWithPrivateKey,
+  bytesToHex,
+  hexToBytes,
+} from "./crypto.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const projectRoot = join(__dirname, "..", "..", "..");
+config({ path: join(projectRoot, ".env") });
 
-const RPC_URL = process.env.RPC_URL ?? "http://127.0.0.1:8545";
-const BUNDLER_URL = process.env.BUNDLER_URL ?? "http://127.0.0.1:4337";
-const PAYMASTER_URL = process.env.PAYMASTER_URL ?? "http://127.0.0.1:3000";
-const USDC_ADDRESS = (process.env.USDC_ADDRESS ?? "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359") as Address;
-const CHAIN_ID = parseInt(process.env.CHAIN_ID ?? "137", 10); // Use 137 for Polygon fork
-const FUNDING_AMOUNT = parseUnits(process.env.USDC_FUND_AMOUNT ?? "10", 6);
+// ========== ENV (loaded from .env; no defaults in code) ==========
+function requireEnv(name: string, value: string | undefined): string {
+  if (!value || value.trim() === "") {
+    throw new Error(`Missing required env for send-receive test: ${name}. Set it in .env (SEND-RECEIVE TEST section).`);
+  }
+  return value.trim();
+}
 
-// Anvil account #0 (alice/sender) and #1 (bob/recipient)
-const ALICE_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" as `0x${string}`;
-const BOB_KEY = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d" as `0x${string}`;
+const rawMailAddressFile = requireEnv("TOOLS_MAIL_ADDRESS_FILE", process.env.TOOLS_MAIL_ADDRESS_FILE);
+const ENV = {
+  RPC_URL: requireEnv("TOOLS_RPC_URL", process.env.TOOLS_RPC_URL),
+  CHAIN_ID: requireEnv("TOOLS_CHAIN_ID", process.env.TOOLS_CHAIN_ID),
+  MAIL_ADDRESS_FILE: rawMailAddressFile.startsWith("/") || /^[a-zA-Z]:/.test(rawMailAddressFile)
+    ? rawMailAddressFile
+    : join(projectRoot, rawMailAddressFile),
+  MNEMONIC: requireEnv("CONTRACT_DEPLOYER_MNEMONIC", process.env.CONTRACT_DEPLOYER_MNEMONIC),
+  MESSAGE: requireEnv("TOOLS_MESSAGE", process.env.TOOLS_MESSAGE),
+  USDC_ADDRESS: requireEnv("TOOLS_USDC_ADDRESS", process.env.TOOLS_USDC_ADDRESS ?? process.env.VITE_USDC_ADDRESS) as Address,
+  USDC_FUND_AMOUNT: parseUnits(requireEnv("TOOLS_USDC_FUND_AMOUNT", process.env.TOOLS_USDC_FUND_AMOUNT), 6),
+  WHALE_CANDIDATES: requireEnv("TOOLS_ANVIL_WHALE_CANDIDATES", process.env.TOOLS_ANVIL_WHALE_CANDIDATES ?? process.env.VITE_ANVIL_WHALE_CANDIDATES)
+    .split(",")
+    .map((a) => a.trim())
+    .filter(Boolean) as Address[],
+};
+// ========================================================================================
 
-const USDC_APPROVE_AMOUNT = parseUnits("1000000", 6);
-
-const WHALE_CANDIDATES = [
-  "0x47c031236e19d024b42f8de678d3110562d925b5",
-  "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
-  "0xF977814e90dA44bFA03b6295A0616a897441aceC",
-  "0x28C6c06298d514Db089934071355E5743bf21d60",
-] as Address[];
-
-const PRIVATE_MAIL_ABI = [
+const USDC_ABI = [
   {
     type: "function",
-    name: "registerPublicKey",
-    inputs: [{ name: "pubKey", type: "bytes", internalType: "bytes" }],
+    name: "balanceOf",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address", internalType: "address" }],
+    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
   },
   {
     type: "function",
-    name: "sendMessage",
+    name: "transfer",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address", internalType: "address" },
+      { name: "amount", type: "uint256", internalType: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool", internalType: "bool" }],
+  },
+] as const;
+
+const PRIVATE_MAIL_ABI = [
+  {
+    inputs: [{ name: "pubKey", type: "bytes", internalType: "bytes" }],
+    name: "registerPublicKey",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     inputs: [
       { name: "recipient", type: "address", internalType: "address" },
       { name: "ciphertext", type: "bytes", internalType: "bytes" },
       { name: "contentHash", type: "bytes32", internalType: "bytes32" },
     ],
-    outputs: [{ type: "uint256", internalType: "uint256" }],
+    name: "sendMessage",
+    outputs: [{ name: "messageId", type: "uint256", internalType: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "function",
   },
   {
-    type: "function",
-    name: "getMessage",
     inputs: [{ name: "messageId", type: "uint256", internalType: "uint256" }],
+    name: "getMessage",
     outputs: [
       {
-        type: "tuple",
-        internalType: "struct PrivateMail.Message",
         components: [
           { name: "sender", type: "address", internalType: "address" },
           { name: "recipient", type: "address", internalType: "address" },
           { name: "ciphertext", type: "bytes", internalType: "bytes" },
+          { name: "ciphertextRef", type: "uint256", internalType: "uint256" },
+          { name: "timestamp", type: "uint256", internalType: "uint256" },
+          { name: "contentHash", type: "bytes32", internalType: "bytes32" },
+        ],
+        name: "",
+        type: "tuple",
+        internalType: "struct PrivateMail.Message",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "refId", type: "uint256", internalType: "uint256" }],
+    name: "getLargeCiphertext",
+    outputs: [{ name: "", type: "bytes", internalType: "bytes" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "recipient", type: "address", internalType: "address" }],
+    name: "getRecipientHeadPageId",
+    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "pageId", type: "uint256", internalType: "uint256" }],
+    name: "getPageWithMessages",
+    outputs: [
+      { name: "count", type: "uint8", internalType: "uint8" },
+      { name: "prevPageIdForRecipient", type: "uint256", internalType: "uint256" },
+      {
+        name: "pageMessages",
+        type: "tuple[10]",
+        internalType: "struct PrivateMail.Message[10]",
+        components: [
+          { name: "sender", type: "address", internalType: "address" },
+          { name: "recipient", type: "address", internalType: "address" },
+          { name: "ciphertext", type: "bytes", internalType: "bytes" },
+          { name: "ciphertextRef", type: "uint256", internalType: "uint256" },
           { name: "timestamp", type: "uint256", internalType: "uint256" },
           { name: "contentHash", type: "bytes32", internalType: "bytes32" },
         ],
       },
     ],
     stateMutability: "view",
+    type: "function",
   },
   {
-    type: "event",
-    name: "MessageSent",
-    inputs: [
-      { name: "messageId", type: "uint256", indexed: true, internalType: "uint256" },
-      { name: "sender", type: "address", indexed: true, internalType: "address" },
-      { name: "recipient", type: "address", indexed: true, internalType: "address" },
-      { name: "timestamp", type: "uint256", indexed: false, internalType: "uint256" },
-      { name: "contentHash", type: "bytes32", indexed: false, internalType: "bytes32" },
-    ],
+    inputs: [{ name: "owner", type: "address", internalType: "address" }],
+    name: "isRegistered",
+    outputs: [{ name: "", type: "bool", internalType: "bool" }],
+    stateMutability: "view",
+    type: "function",
   },
 ] as const;
 
-const USDC_ABI = parseAbi([
-  "function balanceOf(address) view returns (uint256)",
-  "function transfer(address to, uint256 amount) returns (bool)",
-  "function approve(address spender, uint256 amount) returns (bool)",
-]);
-
-function loadConfig(): { mailAddress: Address; chainId: number } {
-  const cfgPath = join(__dirname, "../../../services/frontend/public/config/contracts.json");
-  try {
-    const cfg = JSON.parse(readFileSync(cfgPath, "utf8"));
-    const addr = cfg?.PrivateMail?.address;
-    if (!addr) throw new Error("Missing PrivateMail.address in contracts.json");
-    return {
-      mailAddress: addr as Address,
-      chainId: cfg.chainId ?? CHAIN_ID,
-    };
-  } catch (e) {
-    throw new Error(`Failed to load contracts.json from ${cfgPath}: ${(e as Error).message}`);
+function parseArgs(): { message: string; rpcUrl: string } {
+  const args = process.argv.slice(2);
+  let message = ENV.MESSAGE;
+  let rpcUrl = ENV.RPC_URL;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--message" && args[i + 1]) {
+      message = args[++i];
+    } else if (args[i] === "--rpc" && args[i + 1]) {
+      rpcUrl = args[++i];
+    }
   }
+  return { message, rpcUrl };
 }
 
-async function resolvePaymasterAddress(): Promise<Address> {
-  const base = PAYMASTER_URL.replace(/\/$/, "");
-  const res = await fetch(`${base}/paymaster-address`);
-  if (!res.ok) throw new Error(`Paymaster API unreachable: ${res.status}`);
-  const json = (await res.json()) as { paymasterAddress?: string };
-  const addr = json.paymasterAddress?.trim();
-  if (!addr) throw new Error("Paymaster API did not return paymaster address");
+function loadMailAddress(): Address {
+  const mailAddressFile = ENV.MAIL_ADDRESS_FILE;
+  if (!existsSync(mailAddressFile)) {
+    throw new Error(
+      `Mail contract address file not found: ${mailAddressFile}. Run deploy first (cd contracts && npm run deploy:localhost).`
+    );
+  }
+  const addr = readFileSync(mailAddressFile, "utf8").trim();
+  if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) {
+    throw new Error(`Invalid mail address in ${mailAddressFile}`);
+  }
   return addr as Address;
 }
 
+async function detectAnvil(rpcUrl: string): Promise<boolean> {
+  try {
+    const res = await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "anvil_impersonateAccount",
+        params: ["0x0000000000000000000000000000000000000001"],
+      }),
+    });
+    const json = (await res.json()) as { error?: { message: string } };
+    if (json.error) return false;
+    await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 2,
+        method: "anvil_stopImpersonatingAccount",
+        params: ["0x0000000000000000000000000000000000000001"],
+      }),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function fundWithUsdc(
+  rpcUrl: string,
   publicClient: ReturnType<typeof createPublicClient>,
-  testClient: ReturnType<typeof createTestClient>,
   accountAddress: Address
 ): Promise<void> {
-  const usdc = getContract({ address: USDC_ADDRESS, abi: USDC_ABI, client: publicClient });
+  const usdc = getContract({
+    address: ENV.USDC_ADDRESS,
+    abi: USDC_ABI,
+    client: publicClient,
+  });
   const balance = await usdc.read.balanceOf([accountAddress]);
   if (balance >= parseUnits("1", 6)) {
-    console.log(`  Already has ${balance} USDC, skipping fund`);
+    console.log(`  ${accountAddress.slice(0, 10)}... already has ${balance} USDC, skipping`);
     return;
   }
 
   let whale: Address | undefined;
-  for (const candidate of WHALE_CANDIDATES) {
+  for (const candidate of ENV.WHALE_CANDIDATES) {
     const bal = await usdc.read.balanceOf([candidate]);
-    if (bal >= FUNDING_AMOUNT) {
+    if (bal >= ENV.USDC_FUND_AMOUNT) {
       whale = candidate;
       break;
     }
   }
-  if (!whale) throw new Error("No whale has enough USDC. Use Polygon fork (anvil --fork-url)");
+  if (!whale) {
+    throw new Error("No whale has enough USDC. Use Polygon fork (anvil --fork-url <polygon_rpc>).");
+  }
 
-  await testClient.impersonateAccount({ address: whale });
-  await testClient.setBalance({ address: whale, value: BigInt(1e18) });
+  await fetch(rpcUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "anvil_impersonateAccount",
+      params: [whale],
+    }),
+  });
+
+  await fetch(rpcUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "anvil_setBalance",
+      params: [whale, "0x" + BigInt(1e18).toString(16)],
+    }),
+  });
 
   const transferData = encodeFunctionData({
     abi: USDC_ABI,
     functionName: "transfer",
-    args: [accountAddress, FUNDING_AMOUNT],
+    args: [accountAddress, ENV.USDC_FUND_AMOUNT],
   });
-  await publicClient.request({
-    method: "eth_sendTransaction",
-    params: [{ from: whale, to: USDC_ADDRESS, data: transferData, gas: "0x186A0" }],
-  } as never);
 
-  await testClient.stopImpersonatingAccount({ address: whale });
+  const txRes = await fetch(rpcUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 3,
+      method: "eth_sendTransaction",
+      params: [
+        {
+          from: whale,
+          to: ENV.USDC_ADDRESS,
+          data: transferData,
+          gas: "0x186A0",
+        },
+      ],
+    }),
+  });
+  const txJson = (await txRes.json()) as { error?: { message: string }; result?: string };
+  if (txJson.error) {
+    throw new Error(`USDC transfer failed: ${txJson.error.message}`);
+  }
+
+  await fetch(rpcUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 4,
+      method: "anvil_stopImpersonatingAccount",
+      params: [whale],
+    }),
+  });
+
   const after = await usdc.read.balanceOf([accountAddress]);
-  console.log(`  Funded with USDC, balance now: ${after}`);
+  console.log(`  Funded ${accountAddress.slice(0, 10)}... with USDC, balance: ${after}`);
 }
 
-async function register(
-  publicClient: ReturnType<typeof createPublicClient>,
-  paymasterAddress: Address,
-  ownerKey: `0x${string}`,
-  mailAddress: Address,
-  chainId: number
-): Promise<void> {
-  try {
-    const chain = defineChain({
-      id: chainId,
-      name: chainId === 137 ? "Polygon" : "Local Chain",
-      nativeCurrency: chainId === 137
-        ? { name: "MATIC", symbol: "MATIC", decimals: 18 }
-        : { name: "ETH", symbol: "ETH", decimals: 18 },
-      rpcUrls: { default: { http: [RPC_URL] } },
-    });
-    const paymasterClient = createPimlicoClient({
-      entryPoint: { address: entryPoint07Address, version: "0.7" },
-      transport: http(PAYMASTER_URL),
-    });
-    const owner = privateKeyToAccount(ownerKey);
-    const account = await toSimpleSmartAccount({
-      client: publicClient,
-      owner,
-      entryPoint: { address: entryPoint07Address, version: "0.7" },
-    });
-    const smartAccountClient = createSmartAccountClient({
-      account,
-      chain,
-      bundlerTransport: http(BUNDLER_URL),
-      paymaster: paymasterClient,
-      userOperation: {
-        estimateFeesPerGas: async () =>
-          (await paymasterClient.getUserOperationGasPrice()).fast,
-      },
-    });
-
-    const approveData = encodeFunctionData({
-      abi: USDC_ABI,
-      functionName: "approve",
-      args: [paymasterAddress, USDC_APPROVE_AMOUNT],
-    });
-    await smartAccountClient.sendTransaction({
-      calls: [{ to: USDC_ADDRESS, value: 0n, data: approveData }],
-    });
-
-    const pubKeyHex = ("0x04" + "a".repeat(128)) as `0x${string}`;
-    const registerData = encodeFunctionData({
-      abi: PRIVATE_MAIL_ABI,
-      functionName: "registerPublicKey",
-      args: [pubKeyHex],
-    });
-    await smartAccountClient.sendTransaction({
-      calls: [{ to: mailAddress, value: 0n, data: registerData }],
-    });
-  } catch (e: any) {
-    if (e.message?.includes("Bundler estimate failed") || e.message?.includes("paymaster")) {
-      throw new Error(
-        `Paymaster rejected UserOperation. The paymaster may not be configured to accept calls to the PrivateMail contract (${mailAddress}). ` +
-        `Ensure the paymaster whitelist includes this contract address. Original error: ${e.message}`
-      );
-    }
-    throw e;
-  }
+async function setEthBalance(rpcUrl: string, address: Address, valueWei: bigint): Promise<void> {
+  await fetch(rpcUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "anvil_setBalance",
+      params: [address, "0x" + valueWei.toString(16)],
+    }),
+  });
 }
 
-async function sendMessage(
-  publicClient: ReturnType<typeof createPublicClient>,
-  ownerKey: `0x${string}`,
-  mailAddress: Address,
-  recipient: Address,
-  ciphertextHex: `0x${string}`,
-  contentHash: `0x${string}`,
-  chainId: number,
-  paymasterAddress: Address
-): Promise<`0x${string}`> {
-  try {
-    const chain = defineChain({
-      id: chainId,
-      name: chainId === 137 ? "Polygon" : "Local Chain",
-      nativeCurrency: chainId === 137
-        ? { name: "MATIC", symbol: "MATIC", decimals: 18 }
-        : { name: "ETH", symbol: "ETH", decimals: 18 },
-      rpcUrls: { default: { http: [RPC_URL] } },
-    });
-    const paymasterClient = createPimlicoClient({
-      entryPoint: { address: entryPoint07Address, version: "0.7" },
-      transport: http(PAYMASTER_URL),
-    });
-    const owner = privateKeyToAccount(ownerKey);
-    const account = await toSimpleSmartAccount({
-      client: publicClient,
-      owner,
-      entryPoint: { address: entryPoint07Address, version: "0.7" },
-    });
-    const smartAccountClient = createSmartAccountClient({
-      account,
-      chain,
-      bundlerTransport: http(BUNDLER_URL),
-      paymaster: paymasterClient,
-      userOperation: {
-        estimateFeesPerGas: async () =>
-          (await paymasterClient.getUserOperationGasPrice()).fast,
-      },
-    });
-
-    const sendData = encodeFunctionData({
-      abi: PRIVATE_MAIL_ABI,
-      functionName: "sendMessage",
-      args: [recipient, ciphertextHex, contentHash],
-    });
-
-    console.log("   Submitting UserOp to sendMessage...");
-    console.log("   Call data:", sendData.slice(0, 100) + "...");
-
-    const hash = await smartAccountClient.sendTransaction({
-      calls: [{ to: mailAddress, value: 0n, data: sendData }],
-    });
-
-    console.log("   UserOp submitted successfully:", hash);
-
-    // Check transaction receipt to verify execution
-    console.log("   Checking transaction receipt...");
-    try {
-      const receipt = await publicClient.getTransactionReceipt({ hash });
-      console.log(`   Transaction status: ${receipt.status}`);
-      console.log(`   Block number: ${receipt.blockNumber}`);
-      console.log(`   Gas used: ${receipt.gasUsed}`);
-      console.log(`   Logs count: ${receipt.logs.length}`);
-
-      // Check for contract execution logs
-      const contractLogs = receipt.logs.filter(log =>
-        log.address.toLowerCase() === mailAddress.toLowerCase()
-      );
-      console.log(`   Contract logs: ${contractLogs.length}`);
-
-      if (contractLogs.length === 0) {
-        console.warn("   ⚠️  WARNING: No logs from PrivateMail contract - call may have reverted!");
-      }
-
-      // Check for MessageSent events specifically
-      const messageSentLogs = receipt.logs.filter(log =>
-        log.topics[0] === "0xadf67e525d1556d0e0a61997ac1891dec92a21ba974328aa422695a91c27b1bf"
-      );
-      console.log(`   MessageSent events: ${messageSentLogs.length}`);
-
-      if (receipt.status !== "success") {
-        throw new Error(`Transaction reverted with status: ${receipt.status}`);
-      }
-    } catch (receiptError) {
-      console.error("   Error checking receipt:", receiptError);
-    }
-
-    return hash;
-  } catch (e: any) {
-    if (e.message?.includes("Bundler estimate failed") || e.message?.includes("paymaster")) {
-      throw new Error(
-        `Paymaster rejected UserOperation. The paymaster may not be configured to accept calls to the PrivateMail contract (${mailAddress}). ` +
-        `Ensure the paymaster whitelist includes this contract address. Original error: ${e.message}`
-      );
-    }
-    throw e;
-  }
+function deriveAccountFromMnemonic(
+  mnemonic: string,
+  index: number
+): { address: Address; privateKeyBytes: Uint8Array } {
+  const seed = mnemonicToSeedSync(mnemonic);
+  const hdKey = HDKey.fromMasterSeed(seed);
+  const derived = hdKey.derive(`m/44'/60'/0'/0/${index}`);
+  const privateKeyBytes = derived.privateKey!;
+  const hexKey =
+    "0x" +
+    Array.from(privateKeyBytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  const account = privateKeyToAccount(hexKey as `0x${string}`);
+  return { address: account.address, privateKeyBytes };
 }
 
 async function main() {
-  const { mailAddress, chainId } = loadConfig();
-  const effectiveChainId = chainId ?? CHAIN_ID;
+  const { message, rpcUrl } = parseArgs();
 
-  const chain = defineChain({
-    id: effectiveChainId,
-    name: effectiveChainId === 137 ? "Polygon" : "Local Chain",
-    nativeCurrency: effectiveChainId === 137
-      ? { name: "MATIC", symbol: "MATIC", decimals: 18 }
-      : { name: "ETH", symbol: "ETH", decimals: 18 },
-    rpcUrls: { default: { http: [RPC_URL] } },
-  });
+  const chainId = parseInt(ENV.CHAIN_ID, 10);
+  const mnemonic = ENV.MNEMONIC;
+
+  const mailAddress = loadMailAddress();
+  console.log(`Mail contract: ${mailAddress}`);
+  console.log(`RPC: ${rpcUrl}, chainId: ${chainId}`);
+
+  const chain = {
+    id: chainId,
+    name: "local",
+    nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+    rpcUrls: { default: { http: [rpcUrl] } },
+  };
 
   const publicClient = createPublicClient({
     chain,
-    transport: http(RPC_URL),
+    transport: http(rpcUrl),
   });
 
-  // Test contract connectivity
-  console.log("Testing contract connectivity...");
-  try {
-    const code = await publicClient.getCode({ address: mailAddress });
-    console.log(`Contract has ${code ? code.length : 0} bytes of code`);
-  } catch (e) {
-    console.log(`Contract code read error: ${e.message}`);
-  }
+  const walletTransport = http(rpcUrl);
 
-  const testClient = createTestClient({
-    chain,
-    transport: http(RPC_URL),
-    mode: "anvil",
-  });
-
-  const paymasterAddress = await resolvePaymasterAddress();
-
-  const aliceOwner = privateKeyToAccount(ALICE_KEY);
-  const bobOwner = privateKeyToAccount(BOB_KEY);
-
-  const aliceAccount = await toSimpleSmartAccount({
-    client: publicClient,
-    owner: aliceOwner,
-    entryPoint: { address: entryPoint07Address, version: "0.7" },
-  });
-  const bobAccount = await toSimpleSmartAccount({
-    client: publicClient,
-    owner: bobOwner,
-    entryPoint: { address: entryPoint07Address, version: "0.7" },
-  });
-
-  console.log("=== Project5 send-receive test ===");
-  console.log("Alice (sender):", aliceAccount.address);
-  console.log("Bob (recipient):", bobAccount.address);
-  console.log("PrivateMail:", mailAddress);
-  console.log("");
-
-  // 1. Fund both accounts
-  console.log("1. Funding Alice with USDC...");
-  await fundWithUsdc(publicClient, testClient, aliceAccount.address);
-  console.log("2. Funding Bob with USDC...");
-  await fundWithUsdc(publicClient, testClient, bobAccount.address);
-
-  // 3. Register both (recipient must be registered before receiving)
-  console.log("3. Registering Alice...");
-  await register(publicClient, paymasterAddress, ALICE_KEY, mailAddress, effectiveChainId);
-  console.log("4. Registering Bob...");
-  await register(publicClient, paymasterAddress, BOB_KEY, mailAddress, effectiveChainId);
-
-  // 5. Send message from Alice to Bob
-  const plaintext = "Hello Bob from Alice!";
-  const ciphertextHex = toHex(new TextEncoder().encode(plaintext)) as `0x${string}`;
-  const contentHash = keccak256(ciphertextHex);
-  console.log("5. Sending message from Alice to Bob...");
-  console.log(`   From: ${aliceAccount.address}`);
-  console.log(`   To: ${bobAccount.address}`);
-  console.log(`   Contract: ${mailAddress}`);
-  console.log(`   Ciphertext: ${ciphertextHex.slice(0, 20)}...`);
-  console.log(`   Content hash: ${contentHash}`);
-
-  const txHash = await sendMessage(
-    publicClient,
-    ALICE_KEY,
-    mailAddress,
-    bobAccount.address,
-    ciphertextHex,
-    contentHash,
-    effectiveChainId,
-    paymasterAddress
-  );
-  console.log("   Tx hash:", txHash);
-
-  // 6. Receive: query MessageSent and getMessage
-  console.log("   Querying MessageSent events for recipient:", bobAccount.address);
-
-  // Get current block number and query in chunks to avoid Ankr's 1024 block limit
-  const latestBlock = await publicClient.getBlockNumber();
-  const startBlock = latestBlock > 2000n ? latestBlock - 2000n : 0n; // Look back 2000 blocks
-
-  let logs: any[] = [];
-  const chunkSize = 500n; // Use 500 block chunks (well under 1024 limit)
-
-  for (let fromBlock = startBlock; fromBlock <= latestBlock; fromBlock += chunkSize) {
-    const toBlock = fromBlock + chunkSize - 1n > latestBlock ? latestBlock : fromBlock + chunkSize - 1n;
-
-    try {
-      const chunkLogs = await publicClient.getContractEvents({
-        address: mailAddress,
-        abi: PRIVATE_MAIL_ABI,
-        eventName: "MessageSent",
-        args: { recipient: bobAccount.address },
-        fromBlock,
-        toBlock,
-      });
-
-      logs.push(...chunkLogs);
-      console.log(`   Found ${chunkLogs.length} events in block range ${fromBlock}-${toBlock}`);
-    } catch (error) {
-      console.warn(`   Failed to query block range ${fromBlock}-${toBlock}:`, error.message);
-    }
-  }
-
-  console.log(`   Total events found: ${logs.length}`);
-
-  const ids = logs
-    .map((l) => l.args.messageId)
-    .filter((id): id is bigint => id !== undefined)
-    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-
-  console.log("6. Bob's inbox:", ids.length, "message(s)");
-
-  // Debug: Check transaction receipt and events
-  console.log("   Checking transaction receipt...");
-  try {
-    const receipt = await publicClient.getTransactionReceipt({ hash: txHash as `0x${string}` });
-    console.log(`   Transaction status: ${receipt.status}`);
-    console.log(`   Block number: ${receipt.blockNumber}`);
-    console.log(`   Logs count: ${receipt.logs.length}`);
-
-    // Check all logs in the transaction
-    for (let i = 0; i < receipt.logs.length; i++) {
-      const log = receipt.logs[i];
-      console.log(`   Log ${i}: address=${log.address}, topics=${log.topics.length}, data=${log.data.length} bytes`);
-      if (log.topics.length > 0) {
-        console.log(`     Topic 0: ${log.topics[0]}`);
-      }
-    }
-
-    // Check for MessageSent events in the transaction logs
-    const messageSentLogs = receipt.logs.filter(log =>
-      log.topics[0] === "0xadf67e525d1556d0e0a61997ac1891dec92a21ba974328aa422695a91c27b1bf"
+  const code = await publicClient.getCode({ address: mailAddress });
+  if (!code || code === "0x") {
+    throw new Error(
+      `No contract code at ${mailAddress} on RPC ${rpcUrl}. ` +
+        "Make sure deploy-output/mail-address.txt matches the selected network."
     );
-    console.log(`   MessageSent events in tx: ${messageSentLogs.length}`);
-  } catch (e) {
-    console.log(`   Error checking receipt: ${e.message}`);
   }
 
-  // Also check for any MessageSent events on the PrivateMail contract from recent blocks
-  const latestBlock2 = await publicClient.getBlockNumber();
-  const fromBlock2 = latestBlock2 > 500n ? latestBlock2 - 500n : 0n;
+  const sender = deriveAccountFromMnemonic(mnemonic, 0);
+  const recipient = deriveAccountFromMnemonic(mnemonic, 1);
 
-  const allEvents = await publicClient.getContractEvents({
-    address: mailAddress,
-    abi: PRIVATE_MAIL_ABI,
-    eventName: "MessageSent",
-    fromBlock: fromBlock2,
-    toBlock: "latest",
+  const senderEnc = deriveEncryptionKeyPair(sender.privateKeyBytes);
+  const recipientEnc = deriveEncryptionKeyPair(recipient.privateKeyBytes);
+
+  const walletSender = createWalletClient({
+    account: privateKeyToAccount(
+      ("0x" +
+        Array.from(sender.privateKeyBytes)
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("")) as `0x${string}`
+    ),
+    chain,
+    transport: walletTransport,
   });
 
-  if (allEvents.length > 0) {
-    console.log(`   Found ${allEvents.length} MessageSent events on contract:`);
-    for (const event of allEvents.slice(0, 5)) { // Show first 5
-      console.log(`     msg #${event.args.messageId} from ${event.args.sender} to ${event.args.recipient}`);
-    }
-    if (allEvents.length > 5) {
-      console.log(`     ... and ${allEvents.length - 5} more`);
-    }
+  console.log(`Sender: ${sender.address}`);
+  console.log(`Recipient: ${recipient.address}`);
+
+  const isAnvil = await detectAnvil(rpcUrl);
+  if (isAnvil) {
+    console.log("Anvil detected. Funding test accounts with ETH and USDC from whales...");
+    await setEthBalance(rpcUrl, sender.address, BigInt(1e18));
+    await setEthBalance(rpcUrl, recipient.address, BigInt(1e18));
+    await fundWithUsdc(rpcUrl, publicClient, sender.address);
+    await fundWithUsdc(rpcUrl, publicClient, recipient.address);
+  }
+
+  const isSenderReg = await publicClient.readContract({
+    address: mailAddress,
+    abi: PRIVATE_MAIL_ABI,
+    functionName: "isRegistered",
+    args: [sender.address],
+  });
+  if (!isSenderReg) {
+    console.log("Registering sender...");
+    const hash = await walletSender.writeContract({
+      address: mailAddress,
+      abi: PRIVATE_MAIL_ABI,
+      functionName: "registerPublicKey",
+      args: [bytesToHex(senderEnc.publicKey) as `0x${string}`],
+    });
+    await publicClient.waitForTransactionReceipt({ hash });
+    console.log(`Registered sender (tx ${hash})`);
+  }
+
+  const isRecipientReg = await publicClient.readContract({
+    address: mailAddress,
+    abi: PRIVATE_MAIL_ABI,
+    functionName: "isRegistered",
+    args: [recipient.address],
+  });
+  if (!isRecipientReg) {
+    const recipientWallet = createWalletClient({
+      account: privateKeyToAccount(
+        ("0x" +
+          Array.from(recipient.privateKeyBytes)
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("")) as `0x${string}`
+      ),
+      chain,
+      transport: walletTransport,
+    });
+    console.log("Registering recipient...");
+    const hash = await recipientWallet.writeContract({
+      address: mailAddress,
+      abi: PRIVATE_MAIL_ABI,
+      functionName: "registerPublicKey",
+      args: [bytesToHex(recipientEnc.publicKey) as `0x${string}`],
+    });
+    await publicClient.waitForTransactionReceipt({ hash });
+    console.log(`Registered recipient (tx ${hash})`);
+  }
+
+  const plaintext = new TextEncoder().encode(message);
+  const contentHash = keccak256(plaintext);
+  const { ciphertext } = encryptWithPublicKey(plaintext, recipientEnc.publicKey);
+  const ciphertextHex = bytesToHex(ciphertext) as `0x${string}`;
+
+  console.log("Sending message...");
+  const txHash = await walletSender.writeContract({
+    address: mailAddress,
+    abi: PRIVATE_MAIL_ABI,
+    functionName: "sendMessage",
+    args: [recipient.address, ciphertextHex, contentHash],
+  });
+  await publicClient.waitForTransactionReceipt({ hash: txHash });
+  console.log(`Sent (tx ${txHash})`);
+
+  const headPageId = await publicClient.readContract({
+    address: mailAddress,
+    abi: PRIVATE_MAIL_ABI,
+    functionName: "getRecipientHeadPageId",
+    args: [recipient.address],
+  });
+
+  if (headPageId === 0n) {
+    throw new Error("No inbox page found for recipient");
+  }
+
+  const pageResult = await publicClient.readContract({
+    address: mailAddress,
+    abi: PRIVATE_MAIL_ABI,
+    functionName: "getPageWithMessages",
+    args: [headPageId],
+  });
+  const count = pageResult[0];
+  const pageMessages = pageResult[2];
+  const n = Number(count);
+  if (n === 0) {
+    throw new Error("Inbox page empty");
+  }
+
+  const latestMsg = pageMessages[n - 1];
+  let fullCiphertextHex: `0x${string}`;
+  if (latestMsg.ciphertextRef > 0n) {
+    const large = await publicClient.readContract({
+      address: mailAddress,
+      abi: PRIVATE_MAIL_ABI,
+      functionName: "getLargeCiphertext",
+      args: [latestMsg.ciphertextRef],
+    });
+    fullCiphertextHex =
+      typeof large === "string"
+        ? (large as `0x${string}`)
+        : (`0x${Array.from(large as Uint8Array)
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("")}` as `0x${string}`);
   } else {
-    console.log("   No MessageSent events found on contract in recent blocks");
+    const ct = latestMsg.ciphertext;
+    fullCiphertextHex =
+      typeof ct === "string"
+        ? (ct as `0x${string}`)
+        : (`0x${Array.from(ct as Uint8Array)
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("")}` as `0x${string}`);
   }
 
-  const mail = getContract({
-    address: mailAddress,
-    abi: PRIVATE_MAIL_ABI,
-    client: publicClient,
-  });
+  const ciphertextBytes = hexToBytes(fullCiphertextHex);
+  const decrypted = decryptWithPrivateKey(ciphertextBytes, recipientEnc.privateKey);
+  const decryptedText = new TextDecoder().decode(decrypted);
+  const decryptedHash = keccak256(decrypted);
 
-  for (const id of ids) {
-    const msg = await mail.read.getMessage([id]);
-    const len = typeof msg.ciphertext === "string" ? msg.ciphertext.length / 2 - 1 : msg.ciphertext.length;
-    console.log(`   #${id}: from ${msg.sender} at ${msg.timestamp} (${len} bytes ciphertext)`);
-  }
-
-  if (ids.length === 0) {
-    console.error("FAIL: No messages in Bob's inbox");
-    if (allEvents.length > 0) {
-      console.error("But MessageSent events exist on other contracts. Check contract address in contracts.json");
-    }
-    process.exit(1);
-  }
-  const lastMsg = await mail.read.getMessage([ids[ids.length - 1]]);
-  if (lastMsg.sender.toLowerCase() !== aliceAccount.address.toLowerCase()) {
-    console.error("FAIL: Last message sender mismatch");
-    process.exit(1);
-  }
-  // Verify contract is working by checking nextMessageId
-  console.log("   Verifying contract state...");
-  try {
-    const nextId = await mail.read.nextMessageId();
-    console.log(`   Contract nextMessageId: ${nextId}`);
-  } catch (e) {
-    console.log(`   Error reading contract: ${e.message}`);
+  if (decryptedHash !== latestMsg.contentHash) {
+    throw new Error(
+      `Content hash mismatch: expected ${latestMsg.contentHash}, got ${decryptedHash}`
+    );
   }
 
-  console.log("\nPASS: send-receive test completed successfully");
+  console.log(`SUCCESS: Sent and received message: "${decryptedText}"`);
 }
 
 main().catch((err) => {

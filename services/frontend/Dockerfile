@@ -1,15 +1,31 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
+
+# Build args (VITE_* passed at image build time; no defaults)
+ARG VITE_PRIVATE_MAIL_ADDRESS
+ARG VITE_RPC_URL
+ARG VITE_BUNDLER_URL
+ARG VITE_PAYMASTER_API_URL
+ARG VITE_CHAIN_ID
+ARG VITE_ENTRYPOINT_ADDRESS
+ARG VITE_USDC_ADDRESS
+ARG VITE_ANVIL_WHALE_CANDIDATES
+ARG VITE_ENABLE_ANVIL_WHALE_FUNDING
+ENV VITE_PRIVATE_MAIL_ADDRESS=$VITE_PRIVATE_MAIL_ADDRESS \
+    VITE_RPC_URL=$VITE_RPC_URL \
+    VITE_BUNDLER_URL=$VITE_BUNDLER_URL \
+    VITE_PAYMASTER_API_URL=$VITE_PAYMASTER_API_URL \
+    VITE_CHAIN_ID=$VITE_CHAIN_ID \
+    VITE_ENTRYPOINT_ADDRESS=$VITE_ENTRYPOINT_ADDRESS \
+    VITE_USDC_ADDRESS=$VITE_USDC_ADDRESS \
+    VITE_ANVIL_WHALE_CANDIDATES=$VITE_ANVIL_WHALE_CANDIDATES \
+    VITE_ENABLE_ANVIL_WHALE_FUNDING=$VITE_ENABLE_ANVIL_WHALE_FUNDING
+
 COPY services/frontend/package.json services/frontend/yarn.lock* ./
 COPY services/frontend/ ./
-RUN corepack enable && yarn install --frozen-lockfile && yarn run build
+RUN corepack enable && yarn install --frozen-lockfile && yarn build
 
-FROM node:22-alpine
-WORKDIR /app
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/server.js ./server.js
-ENV NODE_ENV=production
-ENV PORT=3001
-ENV CONTRACTS_JSON_PATH=/deploy-output/contracts.json
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY services/frontend/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 3001
-CMD ["node", "server.js"]
