@@ -60,6 +60,36 @@ function App() {
 
   const [composeModalOpen, setComposeModalOpen] = useState(false);
 
+  const copyText = useCallback(async (value: string | null) => {
+    if (!value) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        return;
+      }
+    } catch {
+      // fall through to legacy fallback
+    }
+
+    try {
+      const input = document.createElement("textarea");
+      input.value = value;
+      input.setAttribute("readonly", "");
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.focus();
+      input.select();
+      const copied = document.execCommand("copy");
+      document.body.removeChild(input);
+      if (!copied) {
+        throw new Error("Copy command failed");
+      }
+    } catch {
+      setError("Unable to copy automatically. Please copy manually.");
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
@@ -539,7 +569,7 @@ function App() {
               </code>
               <button
                 type="button"
-                onClick={() => derivedAddress && navigator.clipboard?.writeText(derivedAddress)}
+                onClick={() => void copyText(derivedAddress)}
                 title="Copy"
                 className="copy-button"
               >
@@ -595,7 +625,7 @@ function App() {
             </code>
             <button
               type="button"
-              onClick={() => sessionAddress && navigator.clipboard?.writeText(sessionAddress)}
+              onClick={() => void copyText(sessionAddress)}
               title="Copy"
             >
               Copy
