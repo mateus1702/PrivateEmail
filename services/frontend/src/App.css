@@ -411,10 +411,26 @@
   min-width: auto;
 }
 
+.logged-footer-username {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+}
+
 .logged-footer-balance {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-size: 0.875rem;
   color: rgba(255, 255, 255, 0.8);
   white-space: nowrap;
+}
+
+.logged-footer-balance-refresh {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.875rem;
+  min-width: auto;
+  line-height: 1;
 }
 
 .logged-footer-actions {
@@ -438,6 +454,11 @@
   border: 1px solid var(--glass-border);
   border-radius: var(--border-radius);
   color: inherit;
+}
+
+.username-input::placeholder {
+  color: rgba(255, 255, 255, 0.9);
+  opacity: 1;
 }
 
 .username-row button {

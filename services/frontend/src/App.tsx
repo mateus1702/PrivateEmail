@@ -7,6 +7,7 @@ import {
   loadInboxPage,
   getFullCiphertext,
   getAddressForUsername,
+  getUsernameForAddress,
   type Message,
 } from "./lib/contracts";
 import {
@@ -74,6 +75,7 @@ function App() {
   const [messageModalOpen, setMessageModalOpen] = useState(false);
   const [usernameInput, setUsernameInput] = useState("");
   const [isSettingUsername, setIsSettingUsername] = useState(false);
+  const [sessionUsername, setSessionUsername] = useState<string | null>(null);
 
   const copyText = useCallback(async (value: string | null) => {
     if (!value) return;
@@ -172,6 +174,46 @@ function App() {
     },
     []
   );
+
+  useEffect(() => {
+    if (!sessionAddress) {
+      setSessionUsername(null);
+      return;
+    }
+    setSessionUsername(null); // clear while loading
+    let cancelled = false;
+    (async () => {
+      if (!config || !env) return;
+      try {
+        const onChain = await getUsernameForAddress(
+          config,
+          env.VITE_RPC_URL,
+          sessionAddress as Address
+        );
+        if (!cancelled && onChain) {
+          setSessionUsername(onChain);
+          try {
+            localStorage.setItem(`pm_username_${sessionAddress.toLowerCase()}`, onChain);
+          } catch {
+            /* ignore */
+          }
+          return;
+        }
+      } catch {
+        /* ignore; fall back to localStorage */
+      }
+      if (cancelled) return;
+      try {
+        const stored = localStorage.getItem(`pm_username_${sessionAddress.toLowerCase()}`);
+        setSessionUsername(stored ?? null);
+      } catch {
+        setSessionUsername(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionAddress, config, env]);
 
   const handleContinue = async () => {
     if (!config || !env) return;
@@ -429,6 +471,7 @@ function App() {
   const handleLogout = useCallback(() => {
     setSessionAddress(null);
     setSessionOwnerPrivateKeyHex(null);
+    setSessionUsername(null);
     setSessionUsdcBalance(null);
     setInboxPages([]);
     setInboxNextPageId(0n);
@@ -554,6 +597,14 @@ function App() {
         username,
         ownerPrivateKeyHex: sessionOwnerPrivateKeyHex,
       });
+      setSessionUsername(username);
+      if (sessionAddress) {
+        try {
+          localStorage.setItem(`pm_username_${sessionAddress.toLowerCase()}`, username);
+        } catch {
+          /* ignore */
+        }
+      }
       setUsernameInput("");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -623,6 +674,7 @@ function App() {
       });
       setSendSuccess(hash);
       setMessageText("");
+      setRecipientAddr("");
       setComposeModalOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -755,6 +807,12 @@ function App() {
 
       <footer className="logged-footer-minimal">
         <div className="logged-footer-left">
+          {sessionUsername && (
+            <div className="logged-footer-username">
+              <strong>User:</strong>{" "}
+              <span>{sessionUsername}</span>
+            </div>
+          )}
           <div className="logged-footer-address">
             <strong>Account:</strong>{" "}
             <code title={sessionAddress ?? ""}>
@@ -771,6 +829,14 @@ function App() {
           <div className="logged-footer-balance">
             <strong>USDC:</strong>{" "}
             {sessionUsdcBalance !== null ? formatUnits(sessionUsdcBalance, 6) : "—"}
+            <button
+              onClick={() => void handleRefreshSessionBalance()}
+              disabled={isRefreshingSessionBalance}
+              title="Refresh USDC balance"
+              className="logged-footer-balance-refresh"
+            >
+              {isRefreshingSessionBalance ? "…" : "↻"}
+            </button>
           </div>
         </div>
         <div className="logged-footer-actions">
@@ -790,13 +856,11 @@ function App() {
             </button>
           </div>
           <button
-            onClick={() => {
-              void handleRefreshSessionBalance();
-              void handleLoadInbox(false);
-            }}
-            disabled={isRefreshingSessionBalance || isLoadingInbox}
+            onClick={() => void handleLoadInbox(false)}
+            disabled={isLoadingInbox}
+            title="Refresh inbox"
           >
-            {isRefreshingSessionBalance || isLoadingInbox ? "Refreshing…" : "Refresh"}
+            {isLoadingInbox ? "Refreshing…" : "Refresh inbox"}
           </button>
           <button onClick={() => setComposeModalOpen(true)}>Compose</button>
           <button onClick={handleLogout}>Logout</button>

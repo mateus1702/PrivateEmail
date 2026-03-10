@@ -324,3 +324,34 @@ export async function getAddressForUsername(
   if (addr === "0x0000000000000000000000000000000000000000" || !addr) return null;
   return addr as Address;
 }
+
+const USERNAME_REGISTERED_ABI = parseAbi([
+  "event UsernameRegistered(address indexed owner, string username)",
+]);
+
+/** Fetch the current on-chain username for an address from UsernameRegistered events. */
+export async function getUsernameForAddress(
+  config: ContractsConfig,
+  rpcUrl: string,
+  ownerAddress: Address
+): Promise<string | null> {
+  const chainId = config.chainId;
+  const client = createPublicClient({
+    transport: http(rpcUrl),
+    chain: {
+      id: chainId,
+      name: "unknown",
+      nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+      rpcUrls: { default: { http: [rpcUrl] } },
+    },
+  });
+  const logs = await client.getContractEvents({
+    address: config.PrivateMail.address as Address,
+    abi: USERNAME_REGISTERED_ABI,
+    eventName: "UsernameRegistered",
+    args: { owner: ownerAddress },
+  });
+  if (logs.length === 0) return null;
+  const latest = logs[logs.length - 1];
+  return (latest.args.username as string) ?? null;
+}
