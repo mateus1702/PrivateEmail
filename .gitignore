@@ -8,3 +8,4 @@ deploy-output/mail-address
 !deploy-output/.gitkeep
 *.log
 .DS_Store
+PrivateNotes.txt
