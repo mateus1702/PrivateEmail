@@ -11,6 +11,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
 const CONTRACTS_JSON_PATH = process.env.CONTRACTS_JSON_PATH ?? "/deploy-output/contracts.json";
 const DIST_DIR = join(__dirname, "dist");
+const PAYMASTER_API_URL = process.env.PAYMASTER_API_URL ?? "";
+const BUNDLER_URL = process.env.BUNDLER_URL ?? "";
 
 function serveStatic(pathname) {
   if (pathname === "/" || pathname === "") return join(DIST_DIR, "index.html");
@@ -19,14 +21,58 @@ function serveStatic(pathname) {
   return file.startsWith(DIST_DIR) ? file : null;
 }
 
-const server = createServer((req, res) => {
-  const pathname = new URL(req.url ?? "/", `http://${req.headers.host}`).pathname;
+async function readBody(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  return Buffer.concat(chunks);
+}
+
+async function proxyTo(req, res, pathname, search, baseUrl) {
+  if (!baseUrl) {
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Upstream URL not configured" }));
+    return;
+  }
+  const prefix = pathname.startsWith("/dev-paymaster-api") ? "/dev-paymaster-api" : "/dev-bundler";
+  const path = pathname.slice(prefix.length) || "/";
+  const url = `${baseUrl.replace(/\/$/, "")}${path}${search}`;
+  const body = ["POST", "PUT", "PATCH"].includes(req.method) ? await readBody(req) : undefined;
+  const headers = { ...req.headers };
+  delete headers.host;
+  try {
+    const up = await fetch(url, { method: req.method, headers, body });
+    const buf = Buffer.from(await up.arrayBuffer());
+    const resHeaders = {};
+    up.headers.forEach((v, k) => {
+      if (k.toLowerCase() !== "transfer-encoding") resHeaders[k] = v;
+    });
+    res.writeHead(up.status, resHeaders);
+    res.end(buf);
+  } catch (e) {
+    res.writeHead(502, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: String(e) }));
+  }
+}
+
+const server = createServer(async (req, res) => {
+  const u = new URL(req.url ?? "/", `http://${req.headers.host}`);
+  const pathname = u.pathname;
+  const search = u.search;
+
+  if (pathname.startsWith("/dev-paymaster-api")) {
+    await proxyTo(req, res, pathname, search, PAYMASTER_API_URL);
+    return;
+  }
+  if (pathname.startsWith("/dev-bundler")) {
+    await proxyTo(req, res, pathname, search, BUNDLER_URL);
+    return;
+  }
 
   if (pathname === "/config/env.json") {
     const env = {
       VITE_RPC_URL: process.env.RPC_URL ?? "http://127.0.0.1:8545",
-      VITE_BUNDLER_URL: process.env.BUNDLER_URL ?? "",
-      VITE_PAYMASTER_API_URL: process.env.PAYMASTER_API_URL ?? "",
+      VITE_BUNDLER_URL: BUNDLER_URL ? "/dev-bundler" : "",
+      VITE_PAYMASTER_API_URL: PAYMASTER_API_URL ? "/dev-paymaster-api" : "",
       VITE_CHAIN_ID: process.env.CHAIN_ID ?? "137",
       VITE_ENTRYPOINT_ADDRESS: process.env.ENTRYPOINT_ADDRESS ?? "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
       VITE_USDC_ADDRESS: process.env.USDC_ADDRESS ?? "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
