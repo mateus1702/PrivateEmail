@@ -438,12 +438,14 @@
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .username-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .username-input {
@@ -644,19 +646,37 @@
     flex-direction: column;
     align-items: stretch;
     gap: 1rem;
+    width: 100%;
   }
 
   .logged-footer-address {
     min-width: auto;
+    width: 100%;
   }
 
   .logged-footer-balance {
-    text-align: center;
+    justify-content: center;
     font-size: 0.875rem;
+    width: 100%;
   }
 
   .logged-footer-actions {
+    width: 100%;
     justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .username-row {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .username-input {
+    width: min(280px, 70vw);
+  }
+
+  .logged-footer-actions > button {
+    min-width: 140px;
   }
 
   .modal {
@@ -701,6 +721,39 @@
 
   .logged-footer-minimal {
     padding: 0.75rem 1rem;
+  }
+
+  .logged-footer-address {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .logged-footer-address code {
+    width: 100%;
+    text-align: center;
+  }
+
+  .logged-footer-balance {
+    gap: 0.35rem;
+  }
+
+  .logged-footer-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .username-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.4rem;
+  }
+
+  .username-input,
+  .username-row button,
+  .logged-footer-actions > button {
+    width: 100%;
+    min-width: 0;
   }
 
   .app .back-button {
