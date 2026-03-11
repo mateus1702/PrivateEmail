@@ -2,7 +2,7 @@
 
 **PrivateMail** is a revolutionary decentralized email application that brings secure, private messaging to Web3. Built on Ethereum's ERC-4337 Account Abstraction standard, it enables gasless encrypted email with smart account technology.
 
-🚀 **Live Demo**: PrivateMail is currently live at [http://169.40.135.206:3002/](http://169.40.135.206:3002/) using NoKYO AA infrastructure at [http://169.40.135.206:3001/](http://169.40.135.206:3001/).
+🚀 **Live Demo**: PrivateMail is currently live at [https://www.privatemail.foo/](https://www.privatemail.foo/) using NoKYO AA infrastructure at [https://www.nokycgas.com/](https://www.nokycgas.com/).
 
 ## 🚀 Features
 
