@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { getConfig, getEnv, type ContractsConfig, type EnvConfig } from "./lib/config";
 import {
   createMailClient,
@@ -25,13 +25,39 @@ import {
   bytesToHex,
   hexToBytes,
 } from "./lib/crypto";
+import { parseBirthdayMask, formatBirthdayInput } from "./lib/parseBirthdayMask";
 import { formatUnits, parseUnits, keccak256 } from "viem";
 import type { Address } from "viem";
 import "./App.css";
 
-const MIN_USDC_FOR_REGISTER = parseUnits("1", 6);
-const WHALE_FUND_AMOUNT = parseUnits("10", 6);
+const MIN_USDC_FOR_REGISTER = parseUnits("0.5", 6);
+const WHALE_FUND_AMOUNT = parseUnits("0.5", 6);
 const INBOX_POLL_INTERVAL_MS = 30000;
+
+const READ_STORAGE_KEY = (addr: string) => `pm_read_${addr.toLowerCase()}`;
+
+function getMessageKey(msg: Message): string {
+  return `${msg.sender.toLowerCase()}-${msg.recipient.toLowerCase()}-${msg.timestamp}-${msg.contentHash}`;
+}
+
+function loadReadKeys(addr: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(READ_STORAGE_KEY(addr));
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw) as string[];
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistReadKeys(addr: string, keys: Set<string>): void {
+  try {
+    localStorage.setItem(READ_STORAGE_KEY(addr), JSON.stringify([...keys]));
+  } catch {
+    /* ignore */
+  }
+}
 
 type Screen = "login" | "register" | "logged";
 
@@ -42,6 +68,7 @@ function App() {
   const [screen, setScreen] = useState<Screen>("login");
   const [birthday, setBirthday] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [recipientAddr, setRecipientAddr] = useState("");
   const [messageText, setMessageText] = useState("");
 
@@ -58,6 +85,7 @@ function App() {
   const [isSending, setIsSending] = useState(false);
   const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
+  const [registerUsername, setRegisterUsername] = useState("");
 
   // Session state (cleared on logout)
   const [sessionAddress, setSessionAddress] = useState<string | null>(null);
@@ -73,9 +101,17 @@ function App() {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [decryptedContent, setDecryptedContent] = useState<string | null>(null);
   const [messageModalOpen, setMessageModalOpen] = useState(false);
-  const [usernameInput, setUsernameInput] = useState("");
-  const [isSettingUsername, setIsSettingUsername] = useState(false);
   const [sessionUsername, setSessionUsername] = useState<string | null>(null);
+  const [senderUsernames, setSenderUsernames] = useState<Map<string, string | null>>(new Map());
+  const [sendToast, setSendToast] = useState(false);
+  const [readMessageKeys, setReadMessageKeys] = useState<Set<string>>(new Set());
+
+  const inboxPagesRef = useRef(inboxPages);
+  const inboxNextPageIdRef = useRef(inboxNextPageId);
+  useEffect(() => {
+    inboxPagesRef.current = inboxPages;
+    inboxNextPageIdRef.current = inboxNextPageId;
+  }, [inboxPages, inboxNextPageId]);
 
   const copyText = useCallback(async (value: string | null) => {
     if (!value) return;
@@ -215,21 +251,32 @@ function App() {
     };
   }, [sessionAddress, config, env]);
 
+  useEffect(() => {
+    if (!sessionAddress) {
+      setReadMessageKeys(new Set());
+      return;
+    }
+    setReadMessageKeys(loadReadKeys(sessionAddress));
+  }, [sessionAddress]);
+
   const handleContinue = async () => {
     if (!config || !env) return;
-    const [y, m, d] = birthday.split("-").map(Number);
-    if (!y || !m || !d) {
-      setError("Enter birthday (YYYY-MM-DD)");
+    const ts = parseBirthdayMask(birthday);
+    if (ts === null) {
+      setError("Enter birthday (MM/DD/YYYY)");
       return;
     }
     if (!password || password.length < 8) {
       setError("Password must be at least 8 characters");
       return;
     }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
     setIsContinueLoading(true);
     setError(null);
     try {
-      const ts = Math.floor(new Date(Date.UTC(y, m - 1, d)).getTime() / 1000);
       const aaKey = deriveAaPrivateKey(ts, password);
       const { publicKey } = deriveEncryptionKeyPair(aaKey);
       const pubKeyHex = bytesToHex(publicKeyToBytes(publicKey)) as `0x${string}`;
@@ -251,6 +298,7 @@ function App() {
       setOwnerPrivateKeyHex(ownerHex);
       setUsdcBalance(bal);
       setRegistered(reg);
+      setConfirmPassword("");
 
       if (reg) {
         storeSession(addr, ownerHex);
@@ -409,8 +457,15 @@ function App() {
 
   const handleCompleteRegistration = async () => {
     if (!config || !env || !derivedAddress || !derivedPubKeyHex || !ownerPrivateKeyHex) return;
+    const username = registerUsername.trim().toLowerCase();
+    if (username.length < 3 || username.length > 32) {
+      setError("Please enter a username (3-32 characters)");
+      return;
+    }
     if (usdcBalance === null || usdcBalance < MIN_USDC_FOR_REGISTER) {
-      setError("Need at least 1 USDC. Refresh balance or use Load from whale.");
+      setError(
+        `Need at least 0.5 USDC. Send USDC to: ${derivedAddress}`
+      );
       return;
     }
     if (registered) {
@@ -422,39 +477,80 @@ function App() {
       return;
     }
 
+    const existingOwner = await getAddressForUsername(config, env.VITE_RPC_URL, username);
+    if (existingOwner && existingOwner.toLowerCase() !== derivedAddress.toLowerCase()) {
+      setError("Username is already taken");
+      return;
+    }
+
     setIsRegistering(true);
     setError(null);
     setRegisterSuccess(null);
+    const aaConfig = {
+      bundlerUrl: env.VITE_BUNDLER_URL,
+      paymasterApiUrl: env.VITE_PAYMASTER_API_URL,
+      rpcUrl: env.VITE_RPC_URL,
+      entryPointAddress: env.VITE_ENTRYPOINT_ADDRESS ?? "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+      chainId: parseInt(env.VITE_CHAIN_ID, 10),
+      usdcAddress: env.VITE_USDC_ADDRESS ?? "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+    };
     try {
-      const aaConfig = {
-        bundlerUrl: env.VITE_BUNDLER_URL,
-        paymasterApiUrl: env.VITE_PAYMASTER_API_URL,
-        rpcUrl: env.VITE_RPC_URL,
-        entryPointAddress: env.VITE_ENTRYPOINT_ADDRESS ?? "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
-        chainId: parseInt(env.VITE_CHAIN_ID, 10),
-        usdcAddress: env.VITE_USDC_ADDRESS ?? "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
-      };
       const hash = await submitRegisterPublicKey(aaConfig, {
         mailAddress: config.PrivateMail.address as Address,
         pubKeyHex: derivedPubKeyHex,
         ownerPrivateKeyHex,
       });
+      await submitRegisterUsername(aaConfig, {
+        mailAddress: config.PrivateMail.address as Address,
+        username,
+        ownerPrivateKeyHex,
+      });
       setRegisterSuccess(hash);
       setRegistered(true);
+      setRegisterUsername("");
+      setSessionUsername(username);
+      try {
+        localStorage.setItem(`pm_username_${derivedAddress.toLowerCase()}`, username);
+      } catch {
+        /* ignore */
+      }
       storeSession(derivedAddress, ownerPrivateKeyHex);
     } catch (e) {
       // Some bundlers intermittently fail on receipt polling even when tx succeeded on-chain.
       try {
         const regNow = await isRegistered(config, env.VITE_RPC_URL, derivedAddress as Address);
         if (regNow) {
+          try {
+            await submitRegisterUsername(aaConfig, {
+              mailAddress: config.PrivateMail.address as Address,
+              username,
+              ownerPrivateKeyHex,
+            });
+          } catch (usernameErr) {
+            const msg = usernameErr instanceof Error ? usernameErr.message : String(usernameErr);
+            const isUsernameTaken =
+              msg.includes("0x2b4e2567") || msg.toLowerCase().includes("usernametaken");
+            setError(isUsernameTaken ? "Username is already taken" : msg);
+            return;
+          }
           setRegistered(true);
+          setRegisterUsername("");
+          setSessionUsername(username);
+          try {
+            localStorage.setItem(`pm_username_${derivedAddress.toLowerCase()}`, username);
+          } catch {
+            /* ignore */
+          }
           storeSession(derivedAddress, ownerPrivateKeyHex);
           return;
         }
       } catch {
         // Ignore fallback read errors and preserve original AA error.
       }
-      setError(e instanceof Error ? e.message : String(e));
+      const errMsg = e instanceof Error ? e.message : String(e);
+      const isUsernameTaken =
+        errMsg.includes("0x2b4e2567") || errMsg.toLowerCase().includes("usernametaken");
+      setError(isUsernameTaken ? "Username is already taken" : errMsg);
     } finally {
       setIsRegistering(false);
     }
@@ -463,6 +559,8 @@ function App() {
   const handleBack = useCallback(() => {
     setBirthday("");
     setPassword("");
+    setConfirmPassword("");
+    setRegisterUsername("");
     clearDerivedState();
     setScreen("login");
     setError(null);
@@ -476,6 +574,8 @@ function App() {
     setInboxPages([]);
     setInboxNextPageId(0n);
     setInboxHasMore(true);
+    setSenderUsernames(new Map());
+    setReadMessageKeys(new Set());
     setScreen("login");
     setComposeModalOpen(false);
     setMessageModalOpen(false);
@@ -503,13 +603,16 @@ function App() {
       setIsLoadingInbox(true);
       setError(null);
       try {
-        const pageId = append ? inboxNextPageId : 0n;
+        const pageId = append ? inboxNextPageIdRef.current : 0n;
         const page = await loadInboxPage(
           config,
           env.VITE_RPC_URL,
           sessionAddress as Address,
           pageId
         );
+        const newMessages = append
+          ? [...inboxPagesRef.current, ...page.messages]
+          : page.messages;
         if (append) {
           setInboxPages((prev) => [...prev, ...page.messages]);
         } else {
@@ -517,13 +620,24 @@ function App() {
         }
         setInboxNextPageId(page.prevPageId);
         setInboxHasMore(page.hasMore);
+        const uniqueSenders = [...new Set(newMessages.map((m) => m.sender.toLowerCase()))];
+        const results = await Promise.all(
+          uniqueSenders.map((addr) =>
+            getUsernameForAddress(config, env.VITE_RPC_URL, addr as Address)
+          )
+        );
+        setSenderUsernames((prev) => {
+          const next = new Map(prev);
+          uniqueSenders.forEach((addr, i) => next.set(addr, results[i] ?? null));
+          return next;
+        });
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
         setIsLoadingInbox(false);
       }
     },
-    [config, env, sessionAddress, inboxNextPageId]
+    [config, env, sessionAddress]
   );
 
   useEffect(() => {
@@ -545,10 +659,17 @@ function App() {
 
   const handleOpenMessage = useCallback(
     async (msg: Message) => {
-      if (!sessionOwnerPrivateKeyHex || !config || !env) return;
+      if (!sessionOwnerPrivateKeyHex || !config || !env || !sessionAddress) return;
       setMessageModalOpen(true);
       setSelectedMessage(msg);
       setDecryptedContent(null);
+      const key = getMessageKey(msg);
+      setReadMessageKeys((prev) => {
+        const next = new Set(prev);
+        next.add(key);
+        persistReadKeys(sessionAddress, next);
+        return next;
+      });
       try {
         const ciphertext = await getFullCiphertext(
           config,
@@ -567,51 +688,8 @@ function App() {
         );
       }
     },
-    [sessionOwnerPrivateKeyHex, config, env]
+    [sessionOwnerPrivateKeyHex, config, env, sessionAddress]
   );
-
-  const handleSetUsername = async () => {
-    if (!config || !env || !usernameInput.trim() || !sessionOwnerPrivateKeyHex) return;
-    const username = usernameInput.trim().toLowerCase();
-    if (username.length < 3 || username.length > 32) {
-      setError("Username must be 3-32 characters");
-      return;
-    }
-    if (!env.VITE_BUNDLER_URL || !env.VITE_PAYMASTER_API_URL) {
-      setError("Bundler and Paymaster URLs required");
-      return;
-    }
-    setIsSettingUsername(true);
-    setError(null);
-    try {
-      const aaConfig = {
-        bundlerUrl: env.VITE_BUNDLER_URL,
-        paymasterApiUrl: env.VITE_PAYMASTER_API_URL,
-        rpcUrl: env.VITE_RPC_URL,
-        entryPointAddress: env.VITE_ENTRYPOINT_ADDRESS ?? "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
-        chainId: parseInt(env.VITE_CHAIN_ID, 10),
-        usdcAddress: env.VITE_USDC_ADDRESS ?? "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
-      };
-      await submitRegisterUsername(aaConfig, {
-        mailAddress: config.PrivateMail.address as Address,
-        username,
-        ownerPrivateKeyHex: sessionOwnerPrivateKeyHex,
-      });
-      setSessionUsername(username);
-      if (sessionAddress) {
-        try {
-          localStorage.setItem(`pm_username_${sessionAddress.toLowerCase()}`, username);
-        } catch {
-          /* ignore */
-        }
-      }
-      setUsernameInput("");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setIsSettingUsername(false);
-    }
-  };
 
   const resolveRecipient = useCallback(
     async (input: string): Promise<Address | null> => {
@@ -626,9 +704,14 @@ function App() {
 
   const handleSend = async () => {
     if (!config || !env || !recipientAddr || !messageText || !sessionOwnerPrivateKeyHex) return;
+    const trimmed = recipientAddr.trim();
+    if (/^0x[a-fA-F0-9]{40}$/.test(trimmed)) {
+      setError("Enter recipient by username only");
+      return;
+    }
     const resolved = await resolveRecipient(recipientAddr);
     if (!resolved) {
-      setError("Invalid recipient: address or username not found");
+      setError("Invalid recipient: username not found");
       return;
     }
     if (!env.VITE_BUNDLER_URL || !env.VITE_PAYMASTER_API_URL) {
@@ -665,17 +748,19 @@ function App() {
         usdcAddress: env.VITE_USDC_ADDRESS ?? "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
       };
       const ciphertextHex = bytesToHex(ciphertext) as `0x${string}`;
-      const hash = await submitSendMessage(aaConfig, {
+      await submitSendMessage(aaConfig, {
         mailAddress: config.PrivateMail.address as Address,
         recipient: resolved,
         ciphertextHex,
         contentHash,
         ownerPrivateKeyHex: sessionOwnerPrivateKeyHex,
       });
-      setSendSuccess(hash);
+      setSendSuccess(null);
       setMessageText("");
       setRecipientAddr("");
       setComposeModalOpen(false);
+      setSendToast(true);
+      setTimeout(() => setSendToast(false), 4000);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -695,14 +780,6 @@ function App() {
 
   if (!config || !env) return <div className="app">Loading config…</div>;
 
-  const canRegister =
-    derivedAddress &&
-    derivedPubKeyHex &&
-    ownerPrivateKeyHex &&
-    usdcBalance !== null &&
-    usdcBalance >= MIN_USDC_FOR_REGISTER &&
-    registered === false;
-
   // Login screen
   if (screen === "login") {
     return (
@@ -713,21 +790,35 @@ function App() {
         </div>
         <div className="panel">
           <h2>Login or Register</h2>
-          <input
-            type="date"
-            placeholder="Birthday (YYYY-MM-DD)"
-            value={birthday}
-            onChange={(e) => setBirthday(e.target.value)}
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <button onClick={handleContinue} disabled={isContinueLoading}>
-            {isContinueLoading ? "Checking…" : "Continue"}
-          </button>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleContinue();
+            }}
+          >
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="Birthday (MM/DD/YYYY)"
+              value={birthday}
+              onChange={(e) => setBirthday(formatBirthdayInput(e.target.value))}
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <input
+              type="password"
+              placeholder="Confirm password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+            <button type="submit" disabled={isContinueLoading}>
+              {isContinueLoading ? "Checking…" : "Continue"}
+            </button>
+          </form>
         </div>
 
         {error && <p className="error">{error}</p>}
@@ -748,13 +839,18 @@ function App() {
         </button>
         <div className="panel">
           <h2>Complete Registration</h2>
+          <input
+            placeholder="Username (3-32 characters)"
+            value={registerUsername}
+            onChange={(e) => setRegisterUsername(e.target.value.toLowerCase())}
+          />
+          <p>
+            <strong>Send at least 0.5 USDC to this address to complete registration:</strong>
+          </p>
           <div className="address-row">
-            <div className="address-label">
-              <strong>Your address:</strong>
-            </div>
             <div className="address-content">
               <code title={derivedAddress ?? ""}>
-                {derivedAddress ? `${derivedAddress.slice(0, 10)}…${derivedAddress.slice(-8)}` : ""}
+                {derivedAddress ?? ""}
               </code>
               <button
                 type="button"
@@ -766,7 +862,6 @@ function App() {
               </button>
             </div>
           </div>
-          <p>Send at least 1 USDC to this address to complete registration.</p>
           <p>
             <strong>USDC balance:</strong>{" "}
             {usdcBalance !== null ? formatUnits(usdcBalance, 6) : "—"}
@@ -776,12 +871,12 @@ function App() {
           </button>
           {isAnvil && env.VITE_ENABLE_ANVIL_WHALE_FUNDING !== "false" && (
             <button onClick={handleLoadFromWhale} disabled={isFunding}>
-              {isFunding ? "Loading…" : "Load 10 USDC from whale"}
+              {isFunding ? "Loading…" : "Load 0.5 USDC from whale"}
             </button>
           )}
           <button
             onClick={handleCompleteRegistration}
-            disabled={!canRegister || isRegistering}
+            disabled={isRegistering}
           >
             {isRegistering ? "Registering…" : "Complete registration"}
           </button>
@@ -807,24 +902,9 @@ function App() {
 
       <footer className="logged-footer-minimal">
         <div className="logged-footer-left">
-          {sessionUsername && (
-            <div className="logged-footer-username">
-              <strong>User:</strong>{" "}
-              <span>{sessionUsername}</span>
-            </div>
-          )}
-          <div className="logged-footer-address">
-            <strong>Account:</strong>{" "}
-            <code title={sessionAddress ?? ""}>
-              {sessionAddress ? `${sessionAddress.slice(0, 10)}…${sessionAddress.slice(-8)}` : ""}
-            </code>
-            <button
-              type="button"
-              onClick={() => void copyText(sessionAddress)}
-              title="Copy"
-            >
-              Copy
-            </button>
+          <div className="logged-footer-username">
+            <strong>User:</strong>{" "}
+            {sessionUsername ?? "—"}
           </div>
           <div className="logged-footer-balance">
             <strong>USDC:</strong>{" "}
@@ -840,21 +920,6 @@ function App() {
           </div>
         </div>
         <div className="logged-footer-actions">
-          <div className="username-row">
-            <input
-              placeholder="Username (3-32 chars)"
-              value={usernameInput}
-              onChange={(e) => setUsernameInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && void handleSetUsername()}
-              className="username-input"
-            />
-            <button
-              onClick={() => void handleSetUsername()}
-              disabled={isSettingUsername || !usernameInput.trim()}
-            >
-              {isSettingUsername ? "Setting…" : "Set"}
-            </button>
-          </div>
           <button
             onClick={() => void handleLoadInbox(false)}
             disabled={isLoadingInbox}
@@ -868,38 +933,44 @@ function App() {
       </footer>
 
       <div className="inbox-area">
-        <h3 className="inbox-title">Inbox</h3>
-        {isLoadingInbox && inboxPages.length === 0 ? (
-          <p className="inbox-loading">Loading…</p>
-        ) : inboxPages.length === 0 ? (
-          <p className="inbox-empty">No messages</p>
-        ) : (
-          <ul className="inbox-list">
-            {inboxPages.map((msg, i) => (
-              <li
-                key={i}
-                className="inbox-item"
-                onClick={() => void handleOpenMessage(msg)}
-              >
-                <span className="inbox-sender">
-                  From: {msg.sender.slice(0, 10)}…{msg.sender.slice(-8)}
-                </span>
-                <span className="inbox-time">
-                  {new Date(Number(msg.timestamp) * 1000).toLocaleString()}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {inboxHasMore && (
-          <button
-            className="inbox-load-more"
-            onClick={() => void handleLoadInbox(true)}
-            disabled={isLoadingInbox}
-          >
-            {isLoadingInbox ? "Loading…" : "Load more"}
-          </button>
-        )}
+        <div className="inbox-messages-container">
+          {isLoadingInbox && inboxPages.length === 0 ? (
+            <p className="inbox-loading">Loading…</p>
+          ) : inboxPages.length === 0 ? (
+            <p className="inbox-empty">No messages</p>
+          ) : (
+            <ul className="inbox-list">
+              {inboxPages.map((msg, i) => (
+                <li
+                  key={i}
+                  className="inbox-item"
+                  onClick={() => void handleOpenMessage(msg)}
+                >
+                  {!readMessageKeys.has(getMessageKey(msg)) && (
+                    <span className="inbox-badge-unread">unread</span>
+                  )}
+                  <span className="inbox-sender">
+                    From: {senderUsernames.get(msg.sender.toLowerCase()) ?? "Unknown"}
+                  </span>
+                  <span className="inbox-meta">
+                    <span className="inbox-time">
+                      {new Date(Number(msg.timestamp) * 1000).toLocaleString()}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {inboxHasMore && (
+            <button
+              className="inbox-load-more"
+              onClick={() => void handleLoadInbox(true)}
+              disabled={isLoadingInbox}
+            >
+              {isLoadingInbox ? "Loading…" : "Load more"}
+            </button>
+          )}
+        </div>
       </div>
 
       {messageModalOpen && selectedMessage && (
@@ -907,7 +978,7 @@ function App() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="modal-title">Message</h2>
             <p className="message-sender">
-              From: {selectedMessage.sender}
+              From: {senderUsernames.get(selectedMessage.sender.toLowerCase()) ?? "Unknown"}
             </p>
             <div className="message-content">
               {decryptedContent ?? "Decrypting…"}
@@ -924,11 +995,17 @@ function App() {
       )}
 
       {composeModalOpen && (
-        <div className="modal-overlay" onClick={() => setComposeModalOpen(false)}>
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            setComposeModalOpen(false);
+            setSendSuccess(null);
+          }}
+        >
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="modal-title">Compose</h2>
             <input
-              placeholder="Recipient (address or username)"
+              placeholder="Recipient (username)"
               value={recipientAddr}
               onChange={(e) => setRecipientAddr(e.target.value)}
             />
@@ -938,7 +1015,14 @@ function App() {
               onChange={(e) => setMessageText(e.target.value)}
             />
             <div className="modal-actions">
-              <button type="button" className="modal-close-btn" onClick={() => setComposeModalOpen(false)}>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => {
+                  setComposeModalOpen(false);
+                  setSendSuccess(null);
+                }}
+              >
                 Close
               </button>
               <button onClick={handleSend} disabled={isSending}>
@@ -950,7 +1034,16 @@ function App() {
         </div>
       )}
 
-      {error && <p className="error logged-error">{error}</p>}
+      {sendToast && (
+        <div className="toast toast-success" role="status">
+          Message sent successfully
+        </div>
+      )}
+      {error && (
+          <div className="toast toast-error" role="alert">
+            {error}
+          </div>
+        )}
     </div>
   );
 }

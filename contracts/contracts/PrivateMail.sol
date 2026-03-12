@@ -17,6 +17,7 @@ contract PrivateMail {
     error InvalidPageId(uint256 pageId);
     error InvalidUsername();
     error UsernameTaken(string username);
+    error UsernameAlreadySet(address owner);
     error NotRegistered();
 
     uint256 public constant CIPHER_TEXT_INLINE_MAX = 256;
@@ -51,6 +52,7 @@ contract PrivateMail {
     mapping(address => bool) public hasRegisteredKey;
     mapping(bytes32 => address) public usernameToAddress;
     mapping(address => bytes32) public addressToUsername;
+    mapping(address => string) public usernameOf;
 
     event PublicKeyRegistered(address indexed owner, bytes pubKey);
     event UsernameRegistered(address indexed owner, string username);
@@ -100,18 +102,17 @@ contract PrivateMail {
     }
 
     /**
-     * @notice Register a username for the caller. Must be registered first.
+     * @notice Register a username for the caller. Must be registered first. One-time only.
      * @param username Lowercase alphanumeric, dots, dashes, underscores; 3-32 chars.
      */
     function registerUsername(string calldata username) external {
         if (!hasRegisteredKey[msg.sender]) revert NotRegistered();
+        if (addressToUsername[msg.sender] != bytes32(0)) revert UsernameAlreadySet(msg.sender);
         bytes32 h = _normalizeUsername(username);
         if (usernameToAddress[h] != address(0)) revert UsernameTaken(username);
-        if (addressToUsername[msg.sender] != bytes32(0)) {
-            usernameToAddress[addressToUsername[msg.sender]] = address(0);
-        }
         usernameToAddress[h] = msg.sender;
         addressToUsername[msg.sender] = h;
+        usernameOf[msg.sender] = username;
         emit UsernameRegistered(msg.sender, username);
     }
 

@@ -47,7 +47,7 @@ npm run run -- --message "Custom text" --rpc http://localhost:8545
 When running against an Anvil node (e.g. `anvil --fork-url <polygon_rpc>`), the test detects Anvil and automatically:
 
 1. **Funds ETH** – sets 1 ETH balance on sender and recipient so they can pay gas
-2. **Funds USDC from whales** – impersonates known USDC holders and transfers 10 USDC to each account (for paymaster/AA scenarios or future use)
+2. **Funds USDC from whales** – impersonates known USDC holders and transfers 0.5 USDC to each account (for paymaster/AA scenarios or future use)
 
 Whale candidates and USDC address can be overridden via env:
 

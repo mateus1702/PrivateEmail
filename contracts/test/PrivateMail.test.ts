@@ -58,6 +58,7 @@ describe("PrivateMail", function () {
       await mail.connect(alice).registerUsername("alice");
       expect(await mail.getAddressForUsername("alice")).to.equal(alice.address);
       expect(await mail.getAddressForUsername("ALICE")).to.equal(alice.address);
+      expect(await mail.usernameOf(alice.address)).to.equal("alice");
     });
 
     it("should revert on username before public key", async function () {
@@ -91,16 +92,13 @@ describe("PrivateMail", function () {
       ).to.be.revertedWithCustomError(mail, "InvalidUsername");
     });
 
-    it("should allow changing username", async function () {
+    it("should revert when trying to change username", async function () {
       const { mail, alice } = await deploy();
       await mail.connect(alice).registerPublicKey(PUB_KEY);
       await mail.connect(alice).registerUsername("alice");
-      expect(await mail.getAddressForUsername("alice")).to.equal(alice.address);
-      await mail.connect(alice).registerUsername("alice2");
-      expect(await mail.getAddressForUsername("alice2")).to.equal(alice.address);
-      expect(await mail.getAddressForUsername("alice")).to.equal(
-        ethers.ZeroAddress
-      );
+      await expect(
+        mail.connect(alice).registerUsername("alice2")
+      ).to.be.revertedWithCustomError(mail, "UsernameAlreadySet");
     });
 
     it("should accept allowed username chars", async function () {

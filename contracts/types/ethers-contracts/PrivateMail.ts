@@ -13,7 +13,7 @@ export declare namespace PrivateMail {
     }
 
   export interface PrivateMailInterface extends Interface {
-    getFunction(nameOrSignature: "CIPHER_TEXT_INLINE_MAX" | "MESSAGES_PER_PAGE" | "PREV_PAGE_NONE" | "addressToUsername" | "encryptionPublicKeys" | "getAddressForUsername" | "getLargeCiphertext" | "getMessage" | "getPage" | "getPageWithMessages" | "getPublicKey" | "getRecipientHeadPageId" | "getUsernameHash" | "hasRegisteredKey" | "isRegistered" | "largeCiphertexts" | "messages" | "nextCiphertextRefId" | "nextMessageId" | "nextPageId" | "pages" | "recipientHeadPageId" | "registerPublicKey" | "registerUsername" | "sendMessage" | "usernameToAddress"): FunctionFragment;
+    getFunction(nameOrSignature: "CIPHER_TEXT_INLINE_MAX" | "MESSAGES_PER_PAGE" | "PREV_PAGE_NONE" | "addressToUsername" | "encryptionPublicKeys" | "getAddressForUsername" | "getLargeCiphertext" | "getMessage" | "getPage" | "getPageWithMessages" | "getPublicKey" | "getRecipientHeadPageId" | "getUsernameHash" | "hasRegisteredKey" | "isRegistered" | "largeCiphertexts" | "messages" | "nextCiphertextRefId" | "nextMessageId" | "nextPageId" | "pages" | "recipientHeadPageId" | "registerPublicKey" | "registerUsername" | "sendMessage" | "usernameOf" | "usernameToAddress"): FunctionFragment;
 
     getEvent(nameOrSignatureOrTopic: "MessageSent" | "PublicKeyRegistered" | "UsernameRegistered"): EventFragment;
 
@@ -42,6 +42,7 @@ encodeFunctionData(functionFragment: 'recipientHeadPageId', values: [AddressLike
 encodeFunctionData(functionFragment: 'registerPublicKey', values: [BytesLike]): string;
 encodeFunctionData(functionFragment: 'registerUsername', values: [string]): string;
 encodeFunctionData(functionFragment: 'sendMessage', values: [AddressLike, BytesLike, BytesLike]): string;
+encodeFunctionData(functionFragment: 'usernameOf', values: [AddressLike]): string;
 encodeFunctionData(functionFragment: 'usernameToAddress', values: [BytesLike]): string;
 
     decodeFunctionResult(functionFragment: 'CIPHER_TEXT_INLINE_MAX', data: BytesLike): Result;
@@ -69,6 +70,7 @@ decodeFunctionResult(functionFragment: 'recipientHeadPageId', data: BytesLike): 
 decodeFunctionResult(functionFragment: 'registerPublicKey', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'registerUsername', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'sendMessage', data: BytesLike): Result;
+decodeFunctionResult(functionFragment: 'usernameOf', data: BytesLike): Result;
 decodeFunctionResult(functionFragment: 'usernameToAddress', data: BytesLike): Result;
   }
 
@@ -343,6 +345,14 @@ decodeFunctionResult(functionFragment: 'usernameToAddress', data: BytesLike): Re
     
 
     
+    usernameOf: TypedContractMethod<
+      [arg0: AddressLike, ],
+      [string],
+      'view'
+    >
+    
+
+    
     usernameToAddress: TypedContractMethod<
       [arg0: BytesLike, ],
       [string],
@@ -477,6 +487,11 @@ getFunction(nameOrSignature: 'sendMessage'): TypedContractMethod<
       [recipient: AddressLike, ciphertext: BytesLike, contentHash: BytesLike, ],
       [bigint],
       'nonpayable'
+    >;
+getFunction(nameOrSignature: 'usernameOf'): TypedContractMethod<
+      [arg0: AddressLike, ],
+      [string],
+      'view'
     >;
 getFunction(nameOrSignature: 'usernameToAddress'): TypedContractMethod<
       [arg0: BytesLike, ],

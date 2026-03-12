@@ -138,6 +138,13 @@ const PRIVATE_MAIL_ABI = [
     stateMutability: "view",
     type: "function",
   },
+  {
+    inputs: [{ name: "owner", type: "address", internalType: "address" }],
+    name: "usernameOf",
+    outputs: [{ name: "", type: "string", internalType: "string" }],
+    stateMutability: "view",
+    type: "function",
+  },
 ] as const;
 
 export function createMailClient(config: ContractsConfig, rpcUrl: string) {
@@ -325,33 +332,14 @@ export async function getAddressForUsername(
   return addr as Address;
 }
 
-const USERNAME_REGISTERED_ABI = parseAbi([
-  "event UsernameRegistered(address indexed owner, string username)",
-]);
-
-/** Fetch the current on-chain username for an address from UsernameRegistered events. */
+/** Fetch the username for an address via the usernameOf mapping (direct contract read). */
 export async function getUsernameForAddress(
   config: ContractsConfig,
   rpcUrl: string,
   ownerAddress: Address
 ): Promise<string | null> {
-  const chainId = config.chainId;
-  const client = createPublicClient({
-    transport: http(rpcUrl),
-    chain: {
-      id: chainId,
-      name: "unknown",
-      nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
-      rpcUrls: { default: { http: [rpcUrl] } },
-    },
-  });
-  const logs = await client.getContractEvents({
-    address: config.PrivateMail.address as Address,
-    abi: USERNAME_REGISTERED_ABI,
-    eventName: "UsernameRegistered",
-    args: { owner: ownerAddress },
-  });
-  if (logs.length === 0) return null;
-  const latest = logs[logs.length - 1];
-  return (latest.args.username as string) ?? null;
+  const contract = createMailClient(config, rpcUrl);
+  const username = await contract.read.usernameOf([ownerAddress]);
+  if (!username || username.length === 0) return null;
+  return username;
 }

@@ -153,8 +153,8 @@ To run the frontend outside Docker with hot reload:
 1. Enter birthday (YYYY-MM-DD) and password, then click **Derive address**.
 2. Your smart account address appears. Fund it with USDC (paymaster charges gas in USDC).
 3. **Refresh balance** to check USDC and registration status.
-4. If using Anvil, click **Load 10 USDC from whale** to fund from a known whale (dev only; requires `anvil_impersonateAccount`).
-5. When balance is sufficient (≥ 1 USDC), click **Register** to submit the UserOp.
+4. If using Anvil, click **Load 0.5 USDC from whale** to fund from a known whale (dev only; requires `anvil_impersonateAccount`).
+5. When balance is sufficient (≥ 0.5 USDC), click **Register** to submit the UserOp.
 
 ## Configuration
 
@@ -192,7 +192,7 @@ See `.env.example` for all options. Frontend uses `VITE_*` vars only (no default
 
 **Docker networking**: When project5 runs in Docker and must reach services on the host (e.g. RPC at `127.0.0.1:8545`), use `http://host.docker.internal:8545`.
 
-**Anvil whale funding**: Dev-only. When RPC exposes `anvil_impersonateAccount`, the Register screen shows a button to load 10 USDC from a configured whale. Requires a Polygon fork with USDC and whale balances at the fork block.
+**Anvil whale funding**: Dev-only. When RPC exposes `anvil_impersonateAccount`, the Register screen shows a button to load 0.5 USDC from a configured whale. Requires a Polygon fork with USDC and whale balances at the fork block.
 
 ## 🤝 Contributing
 
