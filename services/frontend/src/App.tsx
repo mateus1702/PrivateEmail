@@ -703,13 +703,31 @@ function App() {
   );
 
   const handleSend = async () => {
-    if (!config || !env || !recipientAddr || !messageText || !sessionOwnerPrivateKeyHex) return;
-    const trimmed = recipientAddr.trim();
-    if (/^0x[a-fA-F0-9]{40}$/.test(trimmed)) {
+    setError(null);
+    const trimmedRecipient = recipientAddr.trim();
+    const trimmedMessage = messageText.trim();
+
+    if (!config || !env) {
+      setError("App config is still loading. Please try again.");
+      return;
+    }
+    if (!sessionOwnerPrivateKeyHex) {
+      setError("Session expired. Please log in again.");
+      return;
+    }
+    if (!trimmedRecipient) {
+      setError("Please enter a recipient username");
+      return;
+    }
+    if (!trimmedMessage) {
+      setError("Please enter a message");
+      return;
+    }
+    if (/^0x[a-fA-F0-9]{40}$/.test(trimmedRecipient)) {
       setError("Enter recipient by username only");
       return;
     }
-    const resolved = await resolveRecipient(recipientAddr);
+    const resolved = await resolveRecipient(trimmedRecipient);
     if (!resolved) {
       setError("Invalid recipient: username not found");
       return;
@@ -720,7 +738,6 @@ function App() {
     }
 
     setIsSending(true);
-    setError(null);
     setSendSuccess(null);
     try {
       const recipientPubKey = await createMailClient(config, env.VITE_RPC_URL).read.getPublicKey([
@@ -731,7 +748,7 @@ function App() {
         setError("Recipient has not registered a public key");
         return;
       }
-      const plaintext = new TextEncoder().encode(messageText);
+      const plaintext = new TextEncoder().encode(trimmedMessage);
       const recipPub =
         typeof pk === "string"
           ? hexToBytes(pk as `0x${string}`)
@@ -783,45 +800,82 @@ function App() {
   // Login screen
   if (screen === "login") {
     return (
-      <div className="app">
-        <div className="app-header">
-          <img src="/logo.svg" alt="Private Mail Logo" className="app-logo" />
-          <h1>Private Mail</h1>
+      <div className="app onboarding">
+        <div className="onboarding-shell">
+          <section className="onboarding-marketing">
+            <div className="onboarding-brand">
+              <img src="/logo.svg" alt="Private Mail Logo" className="onboarding-logo" />
+              <span className="onboarding-brand-name">Private Mail</span>
+            </div>
+            <h1 className="onboarding-title">Private communication that feels effortless.</h1>
+            <p className="onboarding-subtitle">
+              Send encrypted on-chain messages in seconds with transparent USDC billing and no
+              seed phrase friction for new users.
+            </p>
+            <div className="onboarding-badges">
+              <span>End-to-end encrypted</span>
+              <span>USDC-paid gas</span>
+              <span>Account abstraction</span>
+            </div>
+            <ul className="onboarding-benefits">
+              <li>Protect sensitive messages with on-chain public keys.</li>
+              <li>Onboard users quickly with birthday + password credentials.</li>
+              <li>Keep pricing predictable with gas and service fees settled in USDC.</li>
+            </ul>
+          </section>
+          <div className="panel onboarding-card">
+            <h2>Create or Access Your Inbox</h2>
+            <p className="onboarding-panel-description">
+              Enter the same birthday and password to open your encrypted mailbox.
+            </p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleContinue();
+              }}
+            >
+              <label className="field-label" htmlFor="birthday">
+                Birthday
+              </label>
+              <input
+                id="birthday"
+                type="text"
+                inputMode="numeric"
+                placeholder="MM/DD/YYYY"
+                value={birthday}
+                onChange={(e) => setBirthday(formatBirthdayInput(e.target.value))}
+              />
+              <label className="field-label" htmlFor="password">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                placeholder="At least 8 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <label className="field-label" htmlFor="confirm-password">
+                Confirm Password
+              </label>
+              <input
+                id="confirm-password"
+                type="password"
+                placeholder="Repeat your password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+              <button type="submit" disabled={isContinueLoading} className="onboarding-primary-btn">
+                {isContinueLoading ? "Securing your inbox..." : "Secure My Inbox"}
+              </button>
+            </form>
+            <p className="panel-footnote">
+              No wallet popup required. Your smart account is created behind the scenes, and gas
+              is charged in USDC with a small Private Mail fee when applicable.
+            </p>
+            {error && <p className="error">{error}</p>}
+          </div>
         </div>
-        <div className="panel">
-          <h2>Login or Register</h2>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleContinue();
-            }}
-          >
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="Birthday (MM/DD/YYYY)"
-              value={birthday}
-              onChange={(e) => setBirthday(formatBirthdayInput(e.target.value))}
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <input
-              type="password"
-              placeholder="Confirm password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-            />
-            <button type="submit" disabled={isContinueLoading}>
-              {isContinueLoading ? "Checking…" : "Continue"}
-            </button>
-          </form>
-        </div>
-
-        {error && <p className="error">{error}</p>}
       </div>
     );
   }
@@ -829,74 +883,106 @@ function App() {
   // Register screen (unregistered users only)
   if (screen === "register") {
     return (
-      <div className="app">
-        <div className="app-header">
-          <img src="/logo.svg" alt="Private Mail Logo" className="app-logo" />
-          <h1>Private Mail</h1>
-        </div>
-        <button onClick={handleBack} className="back-button">
-          Back
-        </button>
-        <div className="panel">
-          <h2>Complete Registration</h2>
-          <input
-            placeholder="Username (3-32 characters)"
-            value={registerUsername}
-            onChange={(e) => setRegisterUsername(e.target.value.toLowerCase())}
-          />
-          <p>
-            <strong>Send at least 0.5 USDC to this address to complete registration:</strong>
-          </p>
-          <div className="address-row">
-            <div className="address-content">
-              <code title={derivedAddress ?? ""}>
-                {derivedAddress ?? ""}
-              </code>
-              <button
-                type="button"
-                onClick={() => void copyText(derivedAddress)}
-                title="Copy"
-                className="copy-button"
-              >
-                Copy
-              </button>
+      <div className="app onboarding">
+        <div className="onboarding-shell">
+          <section className="onboarding-marketing">
+            <div className="onboarding-brand">
+              <img src="/logo.svg" alt="Private Mail Logo" className="onboarding-logo" />
+              <span className="onboarding-brand-name">Private Mail</span>
             </div>
-          </div>
-          <p>
-            <strong>USDC balance:</strong>{" "}
-            {usdcBalance !== null ? formatUnits(usdcBalance, 6) : "—"}
-          </p>
-          <button onClick={handleRefreshBalance} disabled={isRefreshing}>
-            {isRefreshing ? "Refreshing…" : "Refresh balance"}
-          </button>
-          {isAnvil && env.VITE_ENABLE_ANVIL_WHALE_FUNDING !== "false" && (
-            <button onClick={handleLoadFromWhale} disabled={isFunding}>
-              {isFunding ? "Loading…" : "Load 0.5 USDC from whale"}
+            <h1 className="onboarding-title">One final step to activate your private inbox.</h1>
+            <p className="onboarding-subtitle">
+              Choose your username, fund your account once, and start sending encrypted messages
+              with USDC-based billing.
+            </p>
+            <ul className="onboarding-benefits">
+              <li>Your username becomes your contact identity.</li>
+              <li>Funding covers transaction gas paid in USDC.</li>
+              <li>A small Private Mail fee may be added as a percentage of gas used.</li>
+              <li>Everything stays tied to your encrypted smart account.</li>
+            </ul>
+          </section>
+          <div className="panel onboarding-card">
+            <button
+              onClick={handleBack}
+              className="back-button onboarding-back-button"
+              title="Back to login"
+              aria-label="Back to login"
+            >
+              &larr;
             </button>
-          )}
-          <button
-            onClick={handleCompleteRegistration}
-            disabled={isRegistering}
-          >
-            {isRegistering ? "Registering…" : "Complete registration"}
-          </button>
-          {registerSuccess && (
-            <p className="success">Registered. Tx: {registerSuccess.slice(0, 18)}…</p>
-          )}
+            <h2>Activate Account</h2>
+            <p className="onboarding-panel-description">
+              Pick your username and complete a one-time 0.5 USDC activation to cover initial gas
+              and service costs.
+            </p>
+            <label className="field-label" htmlFor="register-username">
+              Username
+            </label>
+            <input
+              id="register-username"
+              placeholder="yourname (3-32 characters)"
+              value={registerUsername}
+              onChange={(e) => setRegisterUsername(e.target.value.toLowerCase())}
+            />
+            <p className="panel-footnote">
+              Send at least <strong>0.5 USDC</strong> to the account below. Usage charges are paid
+              in USDC and can include a small Private Mail fee on top of gas:
+            </p>
+            <div className="address-row">
+              <div className="address-content">
+                <code title={derivedAddress ?? ""}>
+                  {derivedAddress ?? ""}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => void copyText(derivedAddress)}
+                  title="Copy"
+                  className="copy-button"
+                >
+                  Copy Address
+                </button>
+              </div>
+            </div>
+            <p className="balance-text">
+              <strong>USDC balance:</strong>{" "}
+              {usdcBalance !== null ? formatUnits(usdcBalance, 6) : "—"}
+            </p>
+            <button onClick={handleRefreshBalance} disabled={isRefreshing}>
+              {isRefreshing ? "Refreshing..." : "Refresh Balance"}
+            </button>
+            {isAnvil && env.VITE_ENABLE_ANVIL_WHALE_FUNDING !== "false" && (
+              <button onClick={handleLoadFromWhale} disabled={isFunding}>
+                {isFunding ? "Loading..." : "Load 0.5 USDC from Test Whale"}
+              </button>
+            )}
+            <button
+              onClick={handleCompleteRegistration}
+              disabled={isRegistering}
+              className="onboarding-primary-btn"
+            >
+              {isRegistering ? "Activating..." : "Activate My Account"}
+            </button>
+            {registerSuccess && (
+              <p className="success">Registered. Tx: {registerSuccess.slice(0, 18)}…</p>
+            )}
+            {error && <p className="error">{error}</p>}
+          </div>
         </div>
-
-        {error && <p className="error">{error}</p>}
       </div>
     );
   }
 
   // Logged screen (minimal layout with header and footer)
   return (
-    <div className="app app--logged-minimal">
+    <div className="app app--logged-minimal app--logged-pro">
       <header className="logged-header-minimal">
         <div className="logged-header-content">
           <img src="/logo.svg" alt="Private Mail Logo" className="logged-logo-minimal" />
-          <h1 className="logged-title-minimal">Private Mail</h1>
+          <div className="logged-header-text">
+            <h1 className="logged-title-minimal">Private Mail</h1>
+            <p className="logged-subtitle-minimal">Encrypted inbox powered by smart accounts</p>
+          </div>
         </div>
       </header>
 
@@ -921,23 +1007,32 @@ function App() {
         </div>
         <div className="logged-footer-actions">
           <button
+            className="logged-btn logged-btn-ghost"
             onClick={() => void handleLoadInbox(false)}
             disabled={isLoadingInbox}
             title="Refresh inbox"
           >
             {isLoadingInbox ? "Refreshing…" : "Refresh inbox"}
           </button>
-          <button onClick={() => setComposeModalOpen(true)}>Compose</button>
-          <button onClick={handleLogout}>Logout</button>
+          <button className="logged-btn logged-btn-primary" onClick={() => setComposeModalOpen(true)}>
+            Compose
+          </button>
+          <button className="logged-btn logged-btn-danger" onClick={handleLogout}>
+            Logout
+          </button>
         </div>
       </footer>
 
       <div className="inbox-area">
+        <div className="inbox-intro">
+          <h2>Your Inbox</h2>
+          <p>Private, encrypted conversations. Click any message to decrypt and read.</p>
+        </div>
         <div className="inbox-messages-container">
           {isLoadingInbox && inboxPages.length === 0 ? (
             <p className="inbox-loading">Loading…</p>
           ) : inboxPages.length === 0 ? (
-            <p className="inbox-empty">No messages</p>
+            <p className="inbox-empty">No messages yet. Compose your first encrypted message.</p>
           ) : (
             <ul className="inbox-list">
               {inboxPages.map((msg, i) => (
@@ -963,7 +1058,7 @@ function App() {
           )}
           {inboxHasMore && (
             <button
-              className="inbox-load-more"
+              className="inbox-load-more logged-btn logged-btn-ghost"
               onClick={() => void handleLoadInbox(true)}
               disabled={isLoadingInbox}
             >
@@ -975,7 +1070,7 @@ function App() {
 
       {messageModalOpen && selectedMessage && (
         <div className="modal-overlay" onClick={() => setMessageModalOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal logged-modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="modal-title">Message</h2>
             <p className="message-sender">
               From: {senderUsernames.get(selectedMessage.sender.toLowerCase()) ?? "Unknown"}
@@ -985,7 +1080,7 @@ function App() {
             </div>
             <button
               type="button"
-              className="modal-close-btn"
+              className="modal-close-btn logged-btn logged-btn-ghost"
               onClick={() => setMessageModalOpen(false)}
             >
               Close
@@ -1002,8 +1097,11 @@ function App() {
             setSendSuccess(null);
           }}
         >
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal logged-modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="modal-title">Compose</h2>
+            <p className="modal-support-copy">
+              Gas is paid in USDC and may include a small Private Mail service fee.
+            </p>
             <input
               placeholder="Recipient (username)"
               value={recipientAddr}
@@ -1017,7 +1115,7 @@ function App() {
             <div className="modal-actions">
               <button
                 type="button"
-                className="modal-close-btn"
+                className="modal-close-btn logged-btn logged-btn-ghost"
                 onClick={() => {
                   setComposeModalOpen(false);
                   setSendSuccess(null);
@@ -1025,7 +1123,7 @@ function App() {
               >
                 Close
               </button>
-              <button onClick={handleSend} disabled={isSending}>
+              <button className="logged-btn logged-btn-primary" onClick={handleSend} disabled={isSending}>
                 {isSending ? "Sending…" : "Send"}
               </button>
             </div>
