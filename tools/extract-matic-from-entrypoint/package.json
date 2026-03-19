@@ -1,0 +1,17 @@
+{
+  "name": "project5-extract-matic-from-entrypoint",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Extract MATIC from an ERC-4337 EntryPoint deposit",
+  "scripts": {
+    "run": "tsx src/extract-matic-from-entrypoint.ts"
+  },
+  "dependencies": {
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

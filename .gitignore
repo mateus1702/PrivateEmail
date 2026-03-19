@@ -1,0 +1,12 @@
+.env
+node_modules/
+dist/
+.next/
+deploy-output/*.json
+deploy-output/*.txt
+deploy-output/mail-address
+!deploy-output/.gitkeep
+*.log
+.DS_Store
+PrivateNotes.txt
+.env.prod

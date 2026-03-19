@@ -1,0 +1,27 @@
+# Project5 - Private Email dApp
+# PREREQUISITE: External ERC-4337 infrastructure (RPC, bundler, paymaster) must be running.
+# Usage (from project5 root): docker compose -f infra/docker/docker-compose.yml --env-file .env up -d
+#
+# Services: frontend-project5
+# Set all VITE_* vars in .env (including VITE_PRIVATE_MAIL_ADDRESS from deploy-output/mail-address.txt after deploy).
+
+services:
+  frontend-project5:
+    build:
+      context: ../..
+      dockerfile: services/frontend/Dockerfile
+      args:
+        VITE_PRIVATE_MAIL_ADDRESS: ${VITE_PRIVATE_MAIL_ADDRESS:-}
+        VITE_RPC_URL: ${VITE_RPC_URL:-}
+        VITE_BUNDLER_URL: ${VITE_BUNDLER_URL:-}
+        VITE_PAYMASTER_API_URL: ${VITE_PAYMASTER_API_URL:-}
+        VITE_CHAIN_ID: ${VITE_CHAIN_ID:-}
+        VITE_ENTRYPOINT_ADDRESS: ${VITE_ENTRYPOINT_ADDRESS:-}
+        VITE_USDC_ADDRESS: ${VITE_USDC_ADDRESS:-}
+        VITE_ANVIL_WHALE_CANDIDATES: ${VITE_ANVIL_WHALE_CANDIDATES:-}
+        VITE_ENABLE_ANVIL_WHALE_FUNDING: ${VITE_ENABLE_ANVIL_WHALE_FUNDING:-}
+        VITE_REFERRAL_BPS: ${VITE_REFERRAL_BPS:-0}
+        VITE_REFERRAL_ADDRESS: ${VITE_REFERRAL_ADDRESS:-0x0000000000000000000000000000000000000000}
+    ports:
+      - "${FRONTEND_PORT:-3002}:3001"
+

@@ -1,0 +1,14 @@
+{
+  "name": "project5-init-env-prod",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Create .env.prod and generate CONTRACT_DEPLOYER_PRIVATE_KEY with address comment",
+  "main": "init-env-prod.js",
+  "scripts": {
+    "run": "node init-env-prod.js"
+  },
+  "dependencies": {
+    "ethers": "^6.15.0"
+  }
+}

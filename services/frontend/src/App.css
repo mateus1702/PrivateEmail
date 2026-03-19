@@ -1,0 +1,46 @@
+/**
+ * App-level styles. Minimal - only for config error/loading states.
+ * Feature styles live in CSS modules and design system.
+ */
+.app {
+  min-height: 100vh;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  color: var(--color-text-primary);
+}
+
+.appStatus {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-3);
+  max-width: 36rem;
+  margin-top: 1rem;
+}
+
+.appStatusIcon {
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+}
+
+.appStatusLoading {
+  align-items: center;
+}
+
+.appStatusLoading p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.app .error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: var(--color-error);
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  margin-top: 0;
+}
