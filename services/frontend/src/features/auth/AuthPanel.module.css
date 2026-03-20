@@ -323,6 +323,14 @@
     overflow: visible;
   }
 
+  .title {
+    font-size: clamp(2rem, 2.2vw, 2.7rem);
+  }
+
+  .trustItem {
+    min-height: 92px;
+  }
+
   .cardMobile {
     display: flex;
     position: relative;
@@ -331,13 +339,14 @@
     top: auto;
     bottom: auto;
     transform: none;
-    height: 100%;
-    max-height: 100%;
-    width: min(480px, calc(100vw - 2rem));
-    justify-self: center;
+    height: auto;
+    max-height: calc(100dvh - 5rem);
+    width: 100%;
+    max-width: 520px;
+    justify-self: end;
     border-radius: var(--radius-2xl);
-    padding: 2.25rem;
-    overflow: visible;
+    padding: 2rem;
+    overflow: auto;
     box-shadow: 0 26px 60px rgba(15, 23, 42, 0.22);
   }
 

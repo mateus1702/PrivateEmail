@@ -26,14 +26,15 @@
 
 @media (min-width: 1101px) {
   .authShell {
-    max-width: 1280px;
-    padding: 3rem 2.5rem;
+    max-width: 1320px;
+    padding: 2.5rem;
     margin: 0 auto;
   }
 
   .grid {
-    grid-template-columns: minmax(720px, 1fr);
-    justify-content: center;
+    grid-template-columns: minmax(640px, 1.2fr) minmax(420px, 0.8fr);
+    justify-content: stretch;
+    align-items: center;
     gap: 2rem;
   }
 }

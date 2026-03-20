@@ -154,7 +154,7 @@ To run the frontend outside Docker with hot reload:
 2. Your smart account address appears. Fund it with USDC (paymaster charges gas in USDC).
 3. **Refresh balance** to check USDC and registration status.
 4. If using Anvil, click **Load 0.5 USDC from whale** to fund from a known whale (dev only; requires `anvil_impersonateAccount`).
-5. When balance is sufficient (≥ 0.5 USDC), click **Register** to submit the UserOp.
+5. Click **Activate My Account** to get a fee estimate in the confirmation modal (fund the address with USDC before confirming if your paymaster requires balance for simulation).
 
 ## Configuration
 

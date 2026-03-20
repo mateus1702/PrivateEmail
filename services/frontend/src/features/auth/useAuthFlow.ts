@@ -25,7 +25,6 @@ import { prepareRegisterOperation } from "../../application";
 import type { CostModalRegisterPayload } from "../shared/types";
 import type { SponsorQuote } from "../../lib/aa";
 
-const MIN_USDC_FOR_REGISTER = parseUnits("0.5", 6);
 const WHALE_FUND_AMOUNT = parseUnits("0.5", 6);
 
 export interface UseAuthFlowInput {
@@ -364,10 +363,6 @@ export function useAuthFlow(input: UseAuthFlowInput): UseAuthFlowResult {
       setError("Please enter a username (3-32 characters)");
       return;
     }
-    if (usdcBalance === null || usdcBalance < MIN_USDC_FOR_REGISTER) {
-      setError(`Need at least 0.5 USDC. Send USDC to: ${derivedAddress}`);
-      return;
-    }
     if (registered) {
       setError("Already registered");
       return;
@@ -417,7 +412,6 @@ export function useAuthFlow(input: UseAuthFlowInput): UseAuthFlowResult {
     derivedPubKeyHex,
     ownerPrivateKeyHex,
     registerUsername,
-    usdcBalance,
     registered,
     onOpenCostModal,
     setError,

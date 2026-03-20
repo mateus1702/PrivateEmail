@@ -153,6 +153,7 @@ function App() {
     costModalPayload,
     derivedAddress: auth.derivedAddress,
     derivedPubKeyHex: auth.derivedPubKeyHex,
+    sessionAddress,
     resetCostModal: resetCost,
     setQuote: setCostModalQuote,
     setPreparedOp: setCostModalPreparedOp,

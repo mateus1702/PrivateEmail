@@ -55,8 +55,8 @@ export function AuthActivationForm({
             Activate Account
           </h2>
           <p className={styles.cardDescription}>
-            Pick your username and complete a one-time 0.5 USDC activation to cover initial gas and service
-            costs.
+            Pick your username and activate. The next step shows the estimated USDC cost (gas and service fees)
+            before you confirm.
           </p>
         </div>
         <IconButton aria-label="Close" onClick={onCloseModal} className={styles.closeButton}>
@@ -72,8 +72,8 @@ export function AuthActivationForm({
         data-testid="auth-username"
       />
       <p className={styles.footnote}>
-        Send at least <strong>0.5 USDC</strong> to the account below. Usage charges are paid in USDC and can
-        include a small Private Mail fee on top of gas:
+        The account below is your smart account address (Polygon). Usage charges are paid in USDC and can
+        include a small Private Mail fee on top of gas.
       </p>
       <div className={styles.addressRow}>
         <div className={styles.addressContent}>

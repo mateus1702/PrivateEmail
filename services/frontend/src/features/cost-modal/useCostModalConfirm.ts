@@ -5,7 +5,9 @@
 import { isQuoteExpired, getQuoteAndPreparedOpForSendMessage } from "../../lib/aa";
 import type { SponsorQuote } from "../../lib/aa";
 import type { SendMessageOp } from "../../lib/aa";
+import { formatUnits, type Address } from "viem";
 import { prepareRegisterOperation, submitPreparedOperation } from "../../application";
+import { getUsdcBalance } from "../../lib/contracts";
 import type { ContractsConfig } from "../../lib/config";
 import type { CostModalRegisterPayload, CostModalSendPayload } from "../shared/types";
 import { useCallback, useState } from "react";
@@ -19,6 +21,8 @@ export interface UseCostModalConfirmInput {
   costModalPayload: CostModalRegisterPayload | CostModalSendPayload | null;
   derivedAddress: string | null;
   derivedPubKeyHex: `0x${string}` | null;
+  /** Logged-in smart account; used with send action for balance check. */
+  sessionAddress: string | null;
   resetCostModal: () => void;
   setQuote: (q: SponsorQuote) => void;
   setPreparedOp: (op: Record<string, unknown>) => void;
@@ -37,6 +41,7 @@ export function useCostModalConfirm(input: UseCostModalConfirmInput) {
     costModalAction,
     derivedAddress,
     derivedPubKeyHex,
+    sessionAddress,
     resetCostModal,
     setQuote,
     setPreparedOp,
@@ -98,6 +103,38 @@ export function useCostModalConfirm(input: UseCostModalConfirmInput) {
         resetFlowState();
         return;
       }
+      setIsConfirming(false);
+      return;
+    }
+
+    const smartAccountForBalance =
+      costModalAction === "register" && "derivedAddress" in payload
+        ? payload.derivedAddress
+        : sessionAddress;
+    if (!smartAccountForBalance) {
+      setStatusMessage("Could not determine smart account address. Try closing and opening the flow again.");
+      setIsConfirming(false);
+      return;
+    }
+
+    try {
+      const balance = await getUsdcBalance(
+        aaConfig.rpcUrl,
+        aaConfig.usdcAddress as Address,
+        smartAccountForBalance as Address,
+      );
+      const maxRequired = BigInt(costModalQuote.maxTotalCostUsdcE6);
+      if (balance < maxRequired) {
+        setStatusMessage(
+          `Insufficient USDC. This operation may charge up to ${formatUnits(maxRequired, 6)} USDC (quoted max); your balance is ${formatUnits(balance, 6)} USDC. Fund this smart account, refresh your balance, then confirm again.`
+        );
+        setIsConfirming(false);
+        return;
+      }
+    } catch (e) {
+      setStatusMessage(
+        `Could not verify USDC balance: ${e instanceof Error ? e.message : String(e)}`
+      );
       setIsConfirming(false);
       return;
     }
