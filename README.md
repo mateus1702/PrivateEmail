@@ -27,11 +27,9 @@
 - **Encrypted message storage** with metadata on-chain
 
 ### Infrastructure
-- **Anvil** local Ethereum fork
-- **ERC-4337 Bundler** (alto)
-- **Paymaster API** with USDC gas sponsorship
-- **Redis/Valkey** for pricing data
-- **Docker** containerized deployment
+- **NoKYC-GasStation** — ERC-4337 Bundler + Paymaster with USDC sponsorship
+- **RPC** — Polygon, Amoy, or local Anvil fork (for development)
+- **Docker** for containerized frontend deployment
 
 ## 🏗️ Architecture
 
@@ -66,7 +64,7 @@
 | **Bundler** | ERC-4337 bundler for UserOp submission. |
 | **Paymaster API** | Service for gas sponsorship / quotes. |
 
-PrivateMail does not run RPC, bundler, or paymaster. Configure endpoints via environment variables. Any compatible ERC-4337 stack (Alto, Pimlico, Biconomy, etc.) can be used.
+PrivateMail does **not** run a bundler or paymaster. You must use an external ERC-4337 stack (we recommend [NoKYC-GasStation](https://github.com/mateus1702/NoKYC-GasStation)). All endpoints are configured via environment variables.
 
 ## 🚀 Quick Start
 

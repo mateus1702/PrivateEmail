@@ -23,6 +23,9 @@
  *
  * Navigation:
  * - chevronLeft: back one step
+ *
+ * External:
+ * - github: link to source repository (pair with visible text or aria-label)
  */
 
 export const ICON_SEMANTICS_DOC = "See iconSemantics.ts header comments." as const;

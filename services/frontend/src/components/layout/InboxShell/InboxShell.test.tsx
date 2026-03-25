@@ -22,6 +22,11 @@ describe("InboxShell", () => {
     );
     expect(screen.getByRole("heading", { name: /PrivateMail/i })).toBeInTheDocument();
     expect(screen.getByText(/Chain-native/)).toBeInTheDocument();
+    const github = screen.getByTestId("header-github-link");
+    expect(github).toHaveAttribute("href", "https://github.com/mateus1702/PrivateMail");
+    expect(github).toHaveAttribute("target", "_blank");
+    expect(github).toHaveAttribute("rel", "noopener noreferrer");
+    expect(github).toHaveTextContent(/source code/i);
   });
 
   it("sets aria-busy on balance refresh button when user refresh is active", () => {

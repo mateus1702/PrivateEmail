@@ -1,4 +1,8 @@
 import type { ReactNode } from "react";
+import {
+  PRIVATEMAIL_GITHUB_URL,
+  PRIVATEMAIL_SOURCE_LINK_LABEL,
+} from "../../../lib/privatemailMeta";
 import { Button, Icon } from "../../ui";
 import styles from "./InboxShell.module.css";
 
@@ -48,6 +52,16 @@ export function InboxShell({
             </p>
           </div>
         </div>
+        <a
+          href={PRIVATEMAIL_GITHUB_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.githubLink}
+          data-testid="header-github-link"
+        >
+          <Icon name="github" size="sm" decorative />
+          <span className={styles.githubLinkLabel}>{PRIVATEMAIL_SOURCE_LINK_LABEL}</span>
+        </a>
       </header>
 
       <main className={styles.content}>{children}</main>

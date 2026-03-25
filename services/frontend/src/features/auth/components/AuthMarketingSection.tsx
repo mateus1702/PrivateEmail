@@ -2,6 +2,11 @@
  * Marketing / hero section on the auth screen (desktop + mobile CTA).
  */
 
+import {
+  PRIVATEMAIL_GITHUB_URL,
+  PRIVATEMAIL_SOURCE_LINK_LABEL,
+} from "../../../lib/privatemailMeta";
+import { Icon } from "../../../components/ui";
 import styles from "../AuthPanel.module.css";
 
 export interface AuthMarketingSectionProps {
@@ -11,9 +16,21 @@ export interface AuthMarketingSectionProps {
 export function AuthMarketingSection({ onOpenAuth }: AuthMarketingSectionProps) {
   return (
     <section className={styles.marketing}>
-      <div className={styles.brand}>
-        <img src="/logo.svg" alt="PrivateMail logo" className={styles.logo} />
-        <span className={styles.brandName}>PrivateMail</span>
+      <div className={styles.brandRow}>
+        <div className={styles.brand}>
+          <img src="/logo.svg" alt="PrivateMail logo" className={styles.logo} />
+          <span className={styles.brandName}>PrivateMail</span>
+        </div>
+        <a
+          href={PRIVATEMAIL_GITHUB_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.githubLink}
+          data-testid="auth-github-link"
+        >
+          <Icon name="github" size="sm" decorative />
+          <span className={styles.githubLinkLabel}>{PRIVATEMAIL_SOURCE_LINK_LABEL}</span>
+        </a>
       </div>
       <p className={styles.eyebrow}>Decentralized. Encrypted. Yours.</p>
       <h1 className={styles.title}>PrivateMail – Inbox on the Blockchain</h1>

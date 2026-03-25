@@ -16,6 +16,7 @@ import {
   GlyphLoading,
   GlyphWallet,
   GlyphChevronLeft,
+  GlyphGithub,
 } from "./glyphs";
 import styles from "./Icon.module.css";
 
@@ -50,6 +51,7 @@ const GLYPHS: Record<IconName, ComponentType<SVGProps<SVGSVGElement>>> = {
   warning: GlyphWarning,
   loading: GlyphLoading,
   chevronLeft: GlyphChevronLeft,
+  github: GlyphGithub,
 };
 
 export function Icon({

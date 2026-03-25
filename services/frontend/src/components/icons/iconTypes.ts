@@ -17,4 +17,5 @@ export type IconName =
   | "inbox"
   | "unread"
   | "message"
-  | "chevronLeft";
+  | "chevronLeft"
+  | "github";

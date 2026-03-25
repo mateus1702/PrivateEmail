@@ -89,6 +89,11 @@ describe("AuthPanel", () => {
     );
     expect(screen.getByText(/PrivateMail – Inbox on the Blockchain/i)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Access Your On-Chain Inbox/i })).toBeInTheDocument();
+    const github = screen.getByTestId("auth-github-link");
+    expect(github).toHaveAttribute("href", "https://github.com/mateus1702/PrivateMail");
+    expect(github).toHaveAttribute("target", "_blank");
+    expect(github).toHaveAttribute("rel", "noopener noreferrer");
+    expect(github).toHaveTextContent(/source code/i);
   });
 
   it("shows error when present", () => {
