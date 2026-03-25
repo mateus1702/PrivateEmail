@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <rect width="32" height="32" rx="7" fill="#0b1220"/>
+  <rect width="32" height="32" rx="7" fill="url(#favicon-glow)" opacity="0.85"/>
+  <path
+    d="M6 11h20a1.5 1.5 0 0 1 1.5 1.5v11A1.5 1.5 0 0 1 26 25H6a1.5 1.5 0 0 1-1.5-1.5v-11A1.5 1.5 0 0 1 6 11Z"
+    stroke="#cbd5e1"
+    stroke-width="1.75"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M4.75 11.75L16 19.5l11.25-7.75"
+    stroke="#cbd5e1"
+    stroke-width="1.75"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <rect x="12.5" y="17.5" width="7" height="5" rx="1" stroke="#818cf8" stroke-width="1.35"/>
+  <path
+    d="M14 17.5v-1.75a2 2 0 0 1 4 0V17.5"
+    stroke="#818cf8"
+    stroke-width="1.35"
+    stroke-linecap="round"
+  />
+  <defs>
+    <radialGradient id="favicon-glow" cx="22%" cy="0%" r="90%" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="rgba(99, 102, 241, 0.35)"/>
+      <stop offset="55%" stop-color="rgba(14, 165, 233, 0.12)"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </radialGradient>
+  </defs>
+</svg>

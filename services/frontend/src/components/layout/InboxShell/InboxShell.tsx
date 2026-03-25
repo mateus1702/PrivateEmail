@@ -48,7 +48,7 @@ export function InboxShell({
           <div className={styles.headerText}>
             <h1 className={styles.title}>PrivateMail</h1>
             <p className={styles.subtitle}>
-              Chain-native • End-to-end encrypted • Gasless
+              Chain-native • E2E encrypted
             </p>
           </div>
         </div>

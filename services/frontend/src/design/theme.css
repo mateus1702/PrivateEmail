@@ -48,8 +48,8 @@
   --spacing-6: 1.5rem;
   --spacing-8: 2rem;
 
-  /* Layout — must clear fixed chrome (inbox header includes logo, wrapped tagline, GitHub stack). */
-  --layout-header-height: 100px;
+  /* Layout */
+  --layout-header-height: 84px;
   --layout-footer-height: 88px;
 
   /* Typography */
@@ -120,7 +120,7 @@
 @media (max-width: 768px) {
   :root,
   [data-theme="dark"] {
-    --layout-header-height: 124px;
+    --layout-header-height: 72px;
     --layout-footer-height: 210px;
   }
 }
@@ -128,7 +128,7 @@
 @media (max-width: 480px) {
   :root,
   [data-theme="dark"] {
-    --layout-header-height: 140px;
+    --layout-header-height: 64px;
     --layout-footer-height: 230px;
   }
 }
