@@ -1,0 +1,388 @@
+.marketing {
+  padding: 20px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  border-radius: var(--radius-2xl);
+  padding: var(--spacing-12);
+  background: radial-gradient(
+      circle at top right,
+      rgba(99, 102, 241, 0.22),
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at bottom left,
+      rgba(14, 165, 233, 0.2),
+      transparent 48%
+    ),
+    linear-gradient(145deg, #0f172a 0%, #1e293b 100%);
+  border: 1px solid var(--color-border-muted);
+  box-shadow: 0 32px 60px rgba(15, 23, 42, 0.45);
+  color: var(--color-text-on-dark);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-full);
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid var(--color-border-muted);
+  margin-bottom: 1.5rem;
+}
+
+.logo {
+  width: 28px;
+  height: 28px;
+}
+
+.brandName {
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.title {
+  font-size: clamp(2rem, 2.85vw, 3.2rem);
+  line-height: 1.08;
+  margin: 0;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #93c5fd;
+  font-size: 0.78rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 0;
+  max-width: 54ch;
+  color: #cbd5e1;
+  font-size: 1rem;
+  line-height: 1.58;
+}
+
+.trustGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.trustItem {
+  margin: 0;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  background: rgba(30, 41, 59, 0.65);
+  padding: 0.8rem;
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.trustValue {
+  margin: 0;
+  color: #e2e8f0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.benefits {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.benefits li {
+  position: relative;
+  padding-left: 1.35rem;
+  color: #dbeafe;
+  line-height: 1.45;
+  font-size: 0.92rem;
+}
+
+.benefits li::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.1rem;
+  color: var(--color-success);
+  font-weight: 700;
+}
+
+.ctaButton {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  width: 100%;
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: 0.95rem 1rem;
+  color: var(--color-text-on-primary);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  background: linear-gradient(
+    135deg,
+    var(--color-accent-primary) 0%,
+    var(--color-accent-secondary) 100%
+  );
+  box-shadow: 0 16px 30px rgba(79, 70, 229, 0.28);
+  z-index: 2;
+  cursor: pointer;
+  transition: var(--transition-default);
+}
+
+.ctaButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 22px 36px rgba(79, 70, 229, 0.34);
+}
+
+.card {
+  position: relative;
+  border-radius: var(--radius-xl);
+  max-width: none;
+  width: calc(100% - 1.5rem);
+  height: 100%;
+  max-height: 100%;
+  overflow: auto;
+  padding: var(--spacing-4);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-muted);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.2);
+  color: #0f172a;
+  display: flex;
+  flex-direction: column;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --color-border-input: #cbd5e1;
+}
+
+.cardHeader {
+  position: relative;
+  margin-bottom: 1.25rem;
+  padding-right: 3rem;
+}
+
+.cardTitleWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 1.45rem;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+}
+
+.cardDescription {
+  text-align: left;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.footnote {
+  margin: 0.5rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.addressRow {
+  margin: 0.65rem 0 1rem;
+  padding: 1.25rem;
+  background: #f8fafc;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-lg);
+}
+
+.addressChainRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.addressChainHint {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.addressContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.addressContent code {
+  font-size: 0.875rem;
+  background: #0f172a;
+  color: var(--color-text-on-dark);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  word-break: break-all;
+  border: 1px solid #1e293b;
+}
+
+.balanceText {
+  color: var(--color-text-primary);
+  margin: 0.5rem 0 1rem;
+}
+
+.backButton {
+  align-self: flex-start;
+  margin-bottom: 1rem;
+}
+
+.closeButton {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.primaryBtn {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.errorBlock {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: var(--color-error);
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  margin-top: 1rem;
+}
+
+.successBlock {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: var(--color-success);
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  margin-top: 0.5rem;
+}
+
+.successTxLink {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.cardMobile {
+  display: none;
+  height: auto;
+  max-height: none;
+}
+
+.cardMobileOpen {
+  display: flex;
+  position: fixed;
+  left: 0.75rem;
+  right: 0.75rem;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+  height: auto;
+  max-height: calc(100dvh - 1.5rem);
+  overflow-y: auto;
+  z-index: 20;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 18;
+}
+
+@media (max-width: 900px) {
+  .trustGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .trustItem {
+    min-height: auto;
+  }
+}
+
+@media (min-width: 1101px) {
+  .marketing {
+    display: block;
+    padding: var(--spacing-12);
+    overflow: visible;
+  }
+
+  .title {
+    font-size: clamp(2rem, 2.2vw, 2.7rem);
+  }
+
+  .trustGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .trustItem {
+    min-height: 92px;
+  }
+
+  .cardMobile {
+    display: flex;
+    position: relative;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    transform: none;
+    height: auto;
+    max-height: calc(100dvh - 5rem);
+    width: 100%;
+    max-width: 520px;
+    justify-self: end;
+    border-radius: var(--radius-2xl);
+    padding: 2rem;
+    overflow: auto;
+    box-shadow: 0 26px 60px rgba(15, 23, 42, 0.22);
+  }
+
+  .cardMobileOpen {
+    left: 50%;
+    right: auto;
+    top: 50%;
+    width: min(480px, calc(100vw - 2rem));
+    transform: translate(-50%, -50%);
+    max-height: calc(100dvh - 2rem);
+  }
+
+  .ctaButton {
+    position: static;
+    margin-top: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctaButton:hover {
+    transform: none;
+  }
+}

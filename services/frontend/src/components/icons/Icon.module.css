@@ -1,0 +1,60 @@
+.wrapper {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  color: inherit;
+}
+
+.wrapper svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.sm {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+}
+
+.md {
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
+}
+
+.lg {
+  width: var(--icon-size-lg);
+  height: var(--icon-size-lg);
+}
+
+.spin {
+  animation: iconSpin 0.85s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+
+@keyframes iconSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.successTone {
+  color: var(--color-success);
+}
+
+.errorTone {
+  color: var(--color-error);
+}
+
+.warningTone {
+  color: var(--color-warning);
+}

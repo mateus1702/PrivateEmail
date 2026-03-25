@@ -1,0 +1,149 @@
+.inboxArea {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.intro {
+  margin-bottom: 1rem;
+  margin-top: 1rem;
+}
+
+.introHeading {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xl);
+}
+
+.introHeadingIcon {
+  color: var(--color-accent-secondary);
+  flex-shrink: 0;
+}
+
+.intro p {
+  margin: 0.35rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.92rem;
+}
+
+.messagesContainer {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: var(--spacing-4);
+  background: rgba(8, 15, 30, 0.55);
+  border: 1px solid var(--color-border-muted);
+  border-radius: var(--radius-xl);
+}
+
+.loading,
+.empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+  margin: auto;
+  text-align: center;
+}
+
+.loadingIcon,
+.emptyIcon {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "sender time";
+  align-items: start;
+  column-gap: 0.75rem;
+  padding: 1rem 4.5rem 1rem 1.25rem;
+  margin-bottom: 0.5rem;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid var(--color-border-muted);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: var(--transition-default);
+}
+
+.item:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(96, 165, 250, 0.45);
+  transform: translateY(-1px);
+}
+
+.sender {
+  grid-area: sender;
+  min-width: 0;
+  font-size: 0.9rem;
+  font-family: var(--font-sans);
+  color: var(--color-text-primary);
+  padding-right: 0.5rem;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.meta {
+  grid-area: time;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-self: end;
+  align-self: center;
+}
+
+.time {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.badgeWrapper {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+}
+
+.loadMore {
+  margin-top: 1rem;
+}
+
+@media (max-width: 480px) {
+  .item {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "sender"
+      "time";
+    row-gap: 0.35rem;
+    align-items: start;
+  }
+
+  .meta {
+    justify-self: start;
+    align-self: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item:hover {
+    transform: none;
+  }
+}

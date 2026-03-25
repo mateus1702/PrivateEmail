@@ -1,0 +1,17 @@
+.env
+node_modules/
+dist/
+.next/
+deploy-output/*.json
+deploy-output/*.txt
+deploy-output/mail-address
+!deploy-output/.gitkeep
+*.log
+.DS_Store
+PrivateNotes.txt
+.env.prod
+Backlog.txt
+.env.local
+BK.env.prod
+BK.env.local
+infra/docker/docker-compose.prod.yml

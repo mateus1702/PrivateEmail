@@ -1,0 +1,245 @@
+.inboxShell {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  max-width: none;
+  overflow: hidden;
+  background: radial-gradient(
+      circle at 10% 0%,
+      rgba(99, 102, 241, 0.22),
+      transparent 42%
+    ),
+    radial-gradient(
+      circle at 90% 100%,
+      rgba(14, 165, 233, 0.2),
+      transparent 46%
+    ),
+    linear-gradient(145deg, #0b1220 0%, #182437 100%);
+}
+
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 1.5rem 2rem;
+  background: rgba(8, 15, 30, 0.7);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  backdrop-filter: blur(18px);
+  z-index: 20;
+  flex-shrink: 0;
+}
+
+.headerContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-4);
+}
+
+.logo {
+  width: 36px;
+  height: 36px;
+  filter: drop-shadow(var(--shadow-sm));
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+}
+
+.content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  margin-top: var(--layout-header-height);
+  margin-bottom: var(--layout-footer-height);
+  padding: calc(var(--layout-header-height) + 1rem) 2rem
+    calc(var(--layout-footer-height) + 1rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1rem 2rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(8, 15, 30, 0.68);
+  backdrop-filter: blur(18px);
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+.footerLeft {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  flex: 1;
+}
+
+.footerUsername {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.footerBalance {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.footerBalanceActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.footerBalanceRefresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.45rem;
+  font-size: var(--font-size-sm);
+  min-width: 2rem;
+  min-height: 2rem;
+  line-height: 1;
+  background: var(--color-interactive-active);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: var(--transition-default);
+}
+
+.footerBalanceRefresh:hover:not(:disabled) {
+  background: var(--color-interactive-hover);
+}
+
+.footerBalanceRefresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.footerBalanceRefreshActive {
+  opacity: 1;
+}
+
+.balanceRefreshIconSpin {
+  animation: balanceRefreshSpin 0.85s linear infinite;
+}
+
+@keyframes balanceRefreshSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.footerActions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 1.25rem 1.5rem;
+  }
+
+  .logo {
+    width: 32px;
+    height: 32px;
+  }
+
+  .title {
+    font-size: 1.5rem;
+  }
+
+  .footer {
+    padding: 1rem 1.5rem;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .content {
+    padding: 1rem 1.5rem;
+  }
+
+  .footerLeft {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    width: 100%;
+  }
+
+  .footerBalance {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .footerActions {
+    width: 100%;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: 1rem;
+  }
+
+  .logo {
+    width: 28px;
+    height: 28px;
+  }
+
+  .title {
+    font-size: 1.25rem;
+  }
+
+  .footer {
+    padding: 0.75rem 1rem;
+  }
+
+  .content {
+    padding: 0.9rem 1rem;
+  }
+
+  .footerActions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

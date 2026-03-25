@@ -1,0 +1,15 @@
+{
+  "name": "project5",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "frontend:dev": "cd services/frontend && yarn dev",
+    "init-env-prod": "cd tools/init-env-prod && npm run run",
+    "extract-matic": "cd tools/extract-matic-from-entrypoint && npm run run",
+    "send-receive-test": "cd tools/send-receive-test && npm run run",
+    "deploy-contract": "cd contracts && npm run build && npm run deploy:localhost",
+    "deploy-contract:localhost": "cd contracts && npm run build && npm run deploy:localhost",
+    "deploy-contract:amoy": "cd contracts && npm run build && npm run deploy:amoy",
+    "deploy-contract:polygon": "cd contracts && npm run build && npm run deploy:polygon"
+  }
+}

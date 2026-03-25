@@ -1,0 +1,107 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-default);
+  border: 1px solid transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-accent-primary);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Sizes */
+.sm {
+  padding: 0.35rem 0.7rem;
+  font-size: var(--font-size-sm);
+}
+
+.md {
+  padding: 0.55rem 0.9rem;
+  font-size: var(--font-size-sm);
+}
+
+.lg {
+  padding: 0.85rem 1rem;
+  font-size: var(--font-size-base);
+}
+
+/* Variants */
+.primary {
+  color: var(--color-text-on-primary);
+  background: linear-gradient(135deg, var(--color-accent-primary) 0%, var(--color-accent-secondary) 100%);
+  box-shadow: 0 12px 24px rgba(79, 70, 229, 0.35);
+}
+
+.primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.secondary {
+  background: var(--color-interactive-active);
+  border-color: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--color-interactive-hover);
+}
+
+.ghost {
+  background: var(--color-interactive-active);
+  border-color: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+.ghost:hover:not(:disabled) {
+  background: var(--color-interactive-hover);
+}
+
+.danger {
+  background: rgba(248, 113, 113, 0.18);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #fecaca;
+}
+
+.danger:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.26);
+}
+
+/* Modal variant overrides */
+.modalGhost {
+  background: #f1f5f9;
+  border-color: var(--color-border-input);
+  color: #334155;
+}
+
+.modalGhost:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.modalPrimary {
+  color: var(--color-text-on-primary);
+  background: linear-gradient(135deg, var(--color-accent-primary) 0%, var(--color-accent-secondary) 100%);
+  border: 1px solid #4338ca;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
+  }
+  .primary:hover:not(:disabled) {
+    transform: none;
+  }
+}
