@@ -54,57 +54,64 @@ export function FundSmartAccountModal({
           <p className={styles.hint}>
             After you transfer, refresh your balance here or in the footer.
           </p>
-          <div className={styles.chainRow}>
-            <Badge variant="default" data-testid="fund-modal-chain-badge">
-              {chainLabel}
-            </Badge>
-            <span className={styles.balanceLine}>
-              <strong>Smart Account USDC:</strong> {usdcBalance ?? "—"}
-            </span>
-            <button
-              type="button"
-              onClick={onRefreshBalance}
-              disabled={isBalanceRefreshing}
-              title="Refresh USDC balance"
-              aria-label="Refresh USDC balance"
-              aria-busy={isBalanceRefreshing}
-              className={
-                isBalanceRefreshing
-                  ? `${styles.balanceRefresh} ${styles.balanceRefreshActive}`
-                  : styles.balanceRefresh
-              }
-              data-testid="fund-modal-refresh-balance"
-            >
-              <Icon
-                name="refresh"
-                size="sm"
-                decorative
-                className={isBalanceRefreshing ? styles.balanceRefreshIconSpin : undefined}
-              />
-            </button>
+          <div className={styles.balanceRow}>
+            <div className={styles.balanceWithRefresh}>
+              <span className={styles.balanceLine}>
+                <strong>Smart Account USDC:</strong> {usdcBalance ?? "—"}
+              </span>
+              <button
+                type="button"
+                onClick={onRefreshBalance}
+                disabled={isBalanceRefreshing}
+                title="Refresh USDC balance"
+                aria-label="Refresh USDC balance"
+                aria-busy={isBalanceRefreshing}
+                className={
+                  isBalanceRefreshing
+                    ? `${styles.balanceRefresh} ${styles.balanceRefreshActive}`
+                    : styles.balanceRefresh
+                }
+                data-testid="fund-modal-refresh-balance"
+              >
+                <Icon
+                  name="refresh"
+                  size="sm"
+                  decorative
+                  className={isBalanceRefreshing ? styles.balanceRefreshIconSpin : undefined}
+                />
+              </button>
+            </div>
           </div>
           {addr ? (
-            <pre className={styles.addressBlock} data-testid="fund-modal-address">
-              {addr}
-            </pre>
+            <div className={styles.addressSection}>
+              <div className={styles.addressBox}>
+                <pre className={styles.addressText} data-testid="fund-modal-address">
+                  {addr}
+                </pre>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  startIcon="copy"
+                  onClick={() => void onCopyAddress()}
+                  className={styles.copyInAddressBox}
+                  data-testid="fund-modal-copy"
+                >
+                  Copy Address
+                </Button>
+              </div>
+              <div className={styles.chainBadgeRow}>
+                <Badge variant="default" data-testid="fund-modal-chain-badge">
+                  {chainLabel}
+                </Badge>
+              </div>
+            </div>
           ) : (
             <p className={styles.hint} role="status">
               Session ended. Log in again to see your address.
             </p>
           )}
-          <div className={styles.actions}>
-            <Button
-              variant="secondary"
-              size="md"
-              modalContext
-              startIcon="copy"
-              disabled={!addr}
-              onClick={() => void onCopyAddress()}
-              data-testid="fund-modal-copy"
-            >
-              Copy Address
-            </Button>
-            {explorerAddressUrl ? (
+          {explorerAddressUrl ? (
+            <div className={styles.actions}>
               <Button
                 variant="secondary"
                 size="md"
@@ -114,8 +121,8 @@ export function FundSmartAccountModal({
               >
                 View on explorer
               </Button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       </ModalBody>
       <ModalFooter>

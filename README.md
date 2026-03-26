@@ -1,8 +1,12 @@
 # PrivateMail - Encrypted Email on Blockchain
 
-**PrivateMail** is a revolutionary decentralized email application that brings secure, private messaging to Web3. Built on Ethereum's ERC-4337 Account Abstraction standard, it enables gasless encrypted email with smart account technology.
+**PrivateMail** is a decentralized email application: encrypted messaging on-chain with ERC-4337 account abstraction and paymaster-sponsored gas (no seed phrases in the default flow—smart accounts derived from credentials you choose).
 
-🚀 **Live Demo**: PrivateMail is currently live at [https://www.privatemail.foo/](https://www.privatemail.foo/) using NoKYC-GasStation AA infrastructure - see the repository at https://github.com/mateus1702/NoKYC-GasStation
+## Why this source code is public
+
+This repository is published so **people who use PrivateMail can verify what they are trusting**: smart contracts, client source, and build instructions are here for **independent review**, reproducible builds, and local testing. **Credibility comes from inspectability.**
+
+PrivateMail’s production deployment at **[privatemail.foo](https://www.privatemail.foo/)** runs on **[NoKYC-GasStation](https://github.com/mateus1702/NoKYC-GasStation)**—ERC-4337 **bundler + paymaster** with **USDC**-denominated sponsorship. If you self-host the app or build a compatible stack, **NoKYC-GasStation is the reference AA infrastructure** this codebase is designed and tested against; the included **Sponsor SDK** (`services/frontend/src/lib/sponsor-sdk`) is the same integration pattern the live product uses.
 
 ## 🚀 Features
 
@@ -27,9 +31,9 @@
 - **Encrypted message storage** with metadata on-chain
 
 ### Infrastructure
-- **NoKYC-GasStation** — ERC-4337 Bundler + Paymaster with USDC sponsorship
+- **[NoKYC-GasStation](https://github.com/mateus1702/NoKYC-GasStation)** — ERC-4337 bundler + paymaster (USDC sponsorship); **the AA stack PrivateMail targets in production**
 - **RPC** — Polygon, Amoy, or local Anvil fork (for development)
-- **Docker** for containerized frontend deployment
+- **Docker** — optional container build for the static frontend only (see `infra/docker/`)
 
 ## 🏗️ Architecture
 
@@ -64,64 +68,62 @@
 | **Bundler** | ERC-4337 bundler for UserOp submission. |
 | **Paymaster API** | Service for gas sponsorship / quotes. |
 
-PrivateMail does **not** run a bundler or paymaster. You must use an external ERC-4337 stack (we recommend [NoKYC-GasStation](https://github.com/mateus1702/NoKYC-GasStation)). All endpoints are configured via environment variables.
+PrivateMail does **not** ship a bundler or paymaster in this repo. For behavior aligned with **[privatemail.foo](https://www.privatemail.foo/)**, use **[NoKYC-GasStation](https://github.com/mateus1702/NoKYC-GasStation)** (or another ERC-4337–compatible stack) and set RPC, bundler, and paymaster URLs via environment variables.
 
 ## 🚀 Quick Start
 
+Commands below assume your shell’s current directory is the **repository root** (the folder that contains `contracts/`, `services/`, and `infra/`).
+
 ### Prerequisites
-- Docker & Docker Compose
-- Node.js & Yarn
+- Docker & Docker Compose (optional; for frontend image only)
+- Node.js, npm (contracts), and Yarn (frontend)
 
 ### Local Development
 
-1. **Start AA Infrastructure:**
-```bash
-cd project4
-docker compose -f infra/docker/docker-compose.yml --env-file .env up -d
-```
+1. **External ERC-4337 stack:** Run RPC, a bundler, and a paymaster API outside this repo—nothing here starts them. **Recommended:** deploy or connect to **[NoKYC-GasStation](https://github.com/mateus1702/NoKYC-GasStation)** so bundler and paymaster APIs match what PrivateMail uses in production. Set `VITE_RPC_URL`, `VITE_BUNDLER_URL`, and `VITE_PAYMASTER_API_URL` (and the rest of the `VITE_*` vars) in `services/frontend/.env` per `services/frontend/.env.example`.
 
-2. **Deploy Contracts:**
+2. **Deploy contracts** (requires a chain reachable at your Hardhat/network config, e.g. local node on port 8545):
 ```bash
-cd project5/contracts
+cd contracts
 npm run deploy:localhost
 ```
 
-3. **Run Frontend:**
+3. **Run frontend:**
 ```bash
-cd project5/services/frontend
+cd services/frontend
 yarn install
 yarn dev
 ```
 
-4. **Open:** http://localhost:5174
+4. **Open:** http://localhost:5173 (default Vite port; your terminal may show a different URL if the port is in use)
 
 ### Docker (static frontend)
 
-1. Ensure AA infrastructure is running.
+1. Ensure **external** RPC, bundler, and paymaster are running and reachable from the **browser** at the URLs you put in `VITE_*`. The compose file in this repo **only** builds and serves the frontend; it does not start AA infrastructure.
 2. Run Hardhat deploy (writes `deploy-output/mail-address.txt`):
    ```bash
    cd contracts && npm run build && npm run deploy:localhost
    ```
    For Polygon/Amoy: `npm run deploy:polygon` or `npm run deploy:amoy` (set `CONTRACT_RPC_URL` and `CONTRACT_DEPLOYER_PRIVATE_KEY` in `.env`).
 3. Set `VITE_PRIVATE_MAIL_ADDRESS` in `.env` (copy from `deploy-output/mail-address.txt`) and all other `VITE_*` vars (see `.env.example`).
-4. Build and start frontend:
+4. From the repository root, build and start the frontend container:
    ```bash
    docker compose -f infra/docker/docker-compose.yml --env-file .env up -d frontend-project5
    ```
 5. Open http://localhost:3002 (or `FRONTEND_PORT`).
 
 ### Test the Flow
-```bash
-cd project5/tools/send-receive-test
-pnpm test  # End-to-end test passes ✅
-```
+
+- **Contracts:** `cd contracts && npm test` (Hardhat)
+- **Frontend:** `cd services/frontend && yarn test` (Vitest)
+- **Optional on-chain script:** `cd tools/send-receive-test && npm install && npm run run` — see `tools/send-receive-test/README.md` for prerequisites (deployed contract, node, root `.env`).
 
 ## 📈 Current Status
 
-✅ **Fully Functional** - Complete end-to-end encrypted email system
-✅ **Tested** - Comprehensive test suite with 100% pass rate
-✅ **Production Ready** - Ready for mainnet deployment
-✅ **Account Abstraction** - Gasless transactions working perfectly
+✅ **Fully Functional** - End-to-end encrypted messaging with a deployed PrivateMail contract and external ERC-4337 stack  
+✅ **Tested** - Hardhat tests, frontend Vitest, optional send/receive script (see **Test the Flow** above)  
+✅ **Production Ready** - Ready for mainnet deployment when paired with production RPC, bundler, and paymaster  
+✅ **Account Abstraction** - Gasless UserOps via configured paymaster and bundler
 
 ## 🔒 Security Features
 
@@ -134,7 +136,7 @@ pnpm test  # End-to-end test passes ✅
 
 To run the frontend outside Docker with hot reload:
 
-1. Start external AA infrastructure (RPC, bundler, paymaster). For local Anvil + project4 stack, run project4's compose first.
+1. Start external AA infrastructure (RPC, bundler, paymaster) and a chain node for your deploy target (e.g. local Anvil). **[NoKYC-GasStation](https://github.com/mateus1702/NoKYC-GasStation)** is the intended reference; other ERC-4337–compatible stacks may work if endpoints and APIs match. This repository does not include those services.
 2. Deploy contracts:
    ```bash
    cd contracts && npm run deploy:localhost
@@ -190,13 +192,13 @@ See `.env.example` for all options. Frontend uses `VITE_*` vars only (no default
 
 **Docker static frontend**: nginx serves pre-built static assets with caching. Set all `VITE_*` vars in `.env` (compose passes them as build args). Build order: 1) deploy contracts (writes `deploy-output/mail-address.txt`), 2) set `VITE_PRIVATE_MAIL_ADDRESS` and other `VITE_*` in `.env`, 3) build frontend image. The browser calls RPC, bundler, and paymaster directly; those endpoints must allow CORS from the frontend origin.
 
-**Docker networking**: When project5 runs in Docker and must reach services on the host (e.g. RPC at `127.0.0.1:8545`), use `http://host.docker.internal:8545`.
+**Docker networking**: `VITE_*` URLs are used by the **browser**, so point them at addresses the user’s machine can reach (e.g. `http://127.0.0.1:8545` for a local node). Use `http://host.docker.internal:...` when a **containerized** step (e.g. contract deploy from a container) must reach a service on the host—see root `.env.example`.
 
 **Anvil whale funding**: Dev-only. When RPC exposes `anvil_impersonateAccount`, the Register screen shows a button to load 0.5 USDC from a configured whale. Requires a Polygon fork with USDC and whale balances at the fork block.
 
 ## dApp Integration Guide
 
-PrivateMail is the canonical reference for integrating with the NoKYC-GasStation paymaster via the **Sponsor SDK**. The SDK lives at `services/frontend/src/lib/sponsor-sdk` and wraps `pm_sponsorUserOperation` for sponsorship, cost confirmation, and TTL handling.
+If you build dApps on **the same NoKYC-GasStation paymaster** as PrivateMail, this repo is a **working reference implementation**: the **Sponsor SDK** at `services/frontend/src/lib/sponsor-sdk` wraps `pm_sponsorUserOperation` for sponsorship quotes, user-facing cost confirmation, and TTL handling—reuse or adapt it in your own clients.
 
 ### Sponsor SDK API
 
@@ -248,16 +250,14 @@ await fetch(bundlerUrl, {
 
 ### Infrastructure
 
-The paymaster API is provided by [NoKYC-GasStation](https://github.com/mateus1702/NoKYC-GasStation). This repository (PrivateMail) demonstrates integration via the Sponsor SDK.
+Sponsorship and paymaster APIs are provided by **[NoKYC-GasStation](https://github.com/mateus1702/NoKYC-GasStation)**. PrivateMail is both a product and a **public integration example** for that stack.
 
-## 🤝 Contributing
+## Source code policy
 
-Issues and PRs welcome! This is a cutting-edge exploration of Account Abstraction for real-world dApps.
-
-## 📄 License
-
-MIT License - see LICENSE file for details.
+- **Transparency:** The code is here so users and researchers can **read, build, and test** what PrivateMail ships.
+- **Pull requests:** **Not accepted.** This project is maintained by the PrivateMail team; the public repo is for **credibility and education**, not community-driven merges.
+- **License:** MIT — see `LICENSE`.
 
 ---
 
-**Built with ❤️ using ERC-4337 Account Abstraction** - The future of Web3 UX is here! 🚀
+PrivateMail · ERC-4337 · **[NoKYC-GasStation](https://github.com/mateus1702/NoKYC-GasStation)**

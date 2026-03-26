@@ -64,7 +64,7 @@ export function AuthActivationForm({
             Activate & Claim Your Username
           </h2>
           <p className={styles.cardDescription}>
-            Choose your public @handle and activate. This registers your encryption key on-chain – one-time,
+            Choose your public username and activate. This registers your encryption key on-chain – one-time,
             forever.
           </p>
         </div>
